@@ -1,0 +1,11 @@
+[project]
+name = "secure-infrastructure-agent"
+version = "0.1.0"
+description = "Secure LLM agent for evidence-based Windows infrastructure diagnostics"
+requires-python = ">=3.13"
+dependencies = [
+    "mcp>=2.3,<3",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
