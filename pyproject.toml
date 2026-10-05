@@ -5,6 +5,7 @@ description = "Secure LLM agent for evidence-based Windows infrastructure diagno
 requires-python = ">=3.13"
 dependencies = [
     "mcp>=2.3,<3",
+    "pypsrp>=0.9.1,<1",
 ]
 
 [tool.pytest.ini_options]

@@ -1,6 +1,7 @@
 from typing import Any
 
 from .base import WindowsExecutor
+from .operations import WindowsOperation
 from ..models import DiskInfo, MemoryInfo, SystemHealth
 
 
@@ -12,8 +13,12 @@ class FakeWindowsExecutor(WindowsExecutor):
     a real Windows host.
     """
 
-    def execute(self, target: str, operation: str) -> Any:
-        if operation == "system_health":
+    def execute(
+        self,
+        target: str,
+        operation: WindowsOperation,
+    ) -> Any:
+        if operation is WindowsOperation.SYSTEM_HEALTH:
             return SystemHealth(
                 target=target,
                 uptime_hours=72.5,

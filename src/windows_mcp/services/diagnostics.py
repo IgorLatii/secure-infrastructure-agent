@@ -1,4 +1,5 @@
 from ..executors.base import WindowsExecutor
+from ..executors.operations import WindowsOperation
 from ..models import SystemHealth
 
 
@@ -16,5 +17,5 @@ class DiagnosticService:
     def get_system_health(self, target: str) -> SystemHealth:
         return self.executor.execute(
             target=target,
-            operation="system_health",
+            operation=WindowsOperation.SYSTEM_HEALTH,
         )

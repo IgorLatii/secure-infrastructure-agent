@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
+from .operations import WindowsOperation
+
 
 class WindowsExecutor(ABC):
     """
@@ -12,13 +14,17 @@ class WindowsExecutor(ABC):
     """
 
     @abstractmethod
-    def execute(self, target: str, operation: str) -> Any:
+    def execute(
+        self,
+        target: str,
+        operation: WindowsOperation,
+    ) -> Any:
         """
         Execute a predefined diagnostic operation against a target.
 
         Args:
             target: Logical Windows target name.
-            operation: Predefined diagnostic operation identifier.
+            operation: Explicitly supported diagnostic operation.
 
         Returns:
             Operation-specific diagnostic data.
