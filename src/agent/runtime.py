@@ -3,6 +3,7 @@ from collections.abc import Awaitable, Callable
 from .llm import AgentLLM
 from .models import ToolCall, ToolResult
 from .policy.tool_policy import ToolPolicy
+from .tool_schema_validator import ToolSchemaValidator
 
 
 ToolExecutor = Callable[[ToolCall], Awaitable[ToolResult]]
@@ -17,15 +18,17 @@ class AgentRuntime:
     """
 
     def __init__(
-        self,
-        llm: AgentLLM,
-        tool_executor: ToolExecutor,
-        policy: ToolPolicy,
-        max_steps: int = 5,
+            self,
+            llm: AgentLLM,
+            tool_executor: ToolExecutor,
+            policy: ToolPolicy,
+            schema_validator: ToolSchemaValidator,
+            max_steps: int = 5,
     ):
         self._llm = llm
         self._tool_executor = tool_executor
         self._policy = policy
+        self._schema_validator = schema_validator
         self._max_steps = max_steps
 
     async def run(self, user_request: str) -> str:
@@ -44,6 +47,8 @@ class AgentRuntime:
                 decision.name,
                 decision.arguments,
             )
+
+            self._schema_validator.validate(decision)
 
             result = await self._tool_executor(decision)
             tool_results.append(result)

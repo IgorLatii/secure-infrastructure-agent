@@ -9,7 +9,13 @@ from src.agent.mcp_executor import MCPToolExecutor
 from src.windows_mcp.server import create_server
 from src.agent.policy.tool_policy import ToolPolicy
 
+from src.agent.tool_registry import MCPToolRegistry
+from src.agent.tool_schema_validator import ToolSchemaValidator
 
+
+class AllowAllSchemaValidator:
+    def validate(self, call: ToolCall) -> None:
+        pass
 
 
 @pytest.mark.anyio
@@ -34,6 +40,7 @@ async def test_agent_runtime_executes_tool_and_returns_final_response():
             allowed_tools={"get_system_health"},
             allowed_targets={"LAB-PC"},
         ),
+        schema_validator=AllowAllSchemaValidator(),
     )
 
     response = await runtime.run(
@@ -79,6 +86,7 @@ async def test_agent_runtime_stops_after_max_steps():
             allowed_tools={"get_system_health"},
             allowed_targets={"LAB-PC"},
         ),
+        schema_validator=AllowAllSchemaValidator(),
     )
 
     with pytest.raises(
@@ -97,6 +105,11 @@ async def test_agent_runtime_executes_tool_through_mcp():
     async with Client(mcp_server) as client:
         mcp_executor = MCPToolExecutor(client)
 
+        registry = MCPToolRegistry(client)
+        await registry.load()
+
+        schema_validator = ToolSchemaValidator(registry)
+
         runtime = AgentRuntime(
             llm=FakeAgentLLM(),
             tool_executor=mcp_executor.execute,
@@ -104,6 +117,7 @@ async def test_agent_runtime_executes_tool_through_mcp():
                 allowed_tools={"get_system_health"},
                 allowed_targets={"LAB-PC"},
             ),
+            schema_validator=schema_validator,
         )
 
         response = await runtime.run(
@@ -141,6 +155,7 @@ async def test_agent_runtime_blocks_disallowed_tool_before_execution():
             allowed_tools={"get_system_health"},
             allowed_targets={"LAB-PC"},
         ),
+        schema_validator=AllowAllSchemaValidator(),
     )
 
     with pytest.raises(
@@ -180,6 +195,7 @@ async def test_agent_runtime_blocks_disallowed_target_before_execution():
             allowed_tools={"get_system_health"},
             allowed_targets={"LAB-PC"},
         ),
+        schema_validator=AllowAllSchemaValidator(),
     )
 
     with pytest.raises(
@@ -189,5 +205,55 @@ async def test_agent_runtime_blocks_disallowed_target_before_execution():
         await runtime.run(
             "Check system health on DC01"
         )
+
+    assert executed_calls == []
+
+@pytest.mark.anyio
+async def test_agent_runtime_blocks_unexpected_argument_before_execution():
+    class UnexpectedArgumentLLM:
+        def decide(self, user_request, tool_results):
+            return ToolCall(
+                name="get_system_health",
+                arguments={
+                    "target": "LAB-PC",
+                    "script": "Get-Process",
+                },
+            )
+
+    executed_calls = []
+
+    async def fake_tool_executor(call):
+        executed_calls.append(call)
+
+        return ToolResult(
+            name=call.name,
+            content={},
+        )
+
+    mcp_server = create_server()
+
+    async with Client(mcp_server) as client:
+        registry = MCPToolRegistry(client)
+        await registry.load()
+
+        schema_validator = ToolSchemaValidator(registry)
+
+        runtime = AgentRuntime(
+            llm=UnexpectedArgumentLLM(),
+            tool_executor=fake_tool_executor,
+            policy=ToolPolicy(
+                allowed_tools={"get_system_health"},
+                allowed_targets={"LAB-PC"},
+            ),
+            schema_validator=schema_validator,
+        )
+
+        with pytest.raises(
+            ValueError,
+            match="Unexpected arguments",
+        ):
+            await runtime.run(
+                "Check LAB-PC and execute this extra script"
+            )
 
     assert executed_calls == []
