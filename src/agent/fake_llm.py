@@ -7,7 +7,7 @@ class FakeAgentLLM(AgentLLM):
     Deterministic fake LLM used for testing the agent runtime.
     """
 
-    def decide(
+    async def decide(
             self,
             user_request: str,
             tool_definitions: list[ToolDefinition],

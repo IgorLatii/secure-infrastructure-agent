@@ -9,7 +9,7 @@ class AgentLLM(ABC):
     """
 
     @abstractmethod
-    def decide(
+    async def decide(
         self,
         user_request: str,
         tool_definitions: list[ToolDefinition],

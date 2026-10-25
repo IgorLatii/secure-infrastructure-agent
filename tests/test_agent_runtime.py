@@ -74,7 +74,7 @@ async def test_agent_runtime_executes_tool_and_returns_final_response():
 @pytest.mark.anyio
 async def test_agent_runtime_stops_after_max_steps():
     class EndlessToolLLM(FakeAgentLLM):
-        def decide(
+        async def decide(
             self,
             user_request: str,
             tool_definitions,
@@ -152,7 +152,7 @@ async def test_agent_runtime_executes_tool_through_mcp():
 @pytest.mark.anyio
 async def test_agent_runtime_blocks_disallowed_tool_before_execution():
     class UnsafeToolLLM:
-        def decide(self, user_request, tool_definitions, tool_results):
+        async def decide(self, user_request, tool_definitions, tool_results):
             return ToolCall(
                 call_id="test-call-1",
                 name="run_powershell",
@@ -198,7 +198,7 @@ async def test_agent_runtime_blocks_disallowed_tool_before_execution():
 @pytest.mark.anyio
 async def test_agent_runtime_blocks_disallowed_target_before_execution():
     class DisallowedTargetLLM:
-        def decide(self, user_request, tool_definitions, tool_results):
+        async def decide(self, user_request, tool_definitions, tool_results):
             return ToolCall(
                 call_id="test-call-1",
                 name="get_system_health",
@@ -240,7 +240,7 @@ async def test_agent_runtime_blocks_disallowed_target_before_execution():
 @pytest.mark.anyio
 async def test_agent_runtime_blocks_unexpected_argument_before_execution():
     class UnexpectedArgumentLLM:
-        def decide(self, user_request, tool_definitions, tool_results):
+        async def decide(self, user_request, tool_definitions, tool_results):
             return ToolCall(
                 call_id="test-call-1",
                 name="get_system_health",
@@ -296,7 +296,7 @@ async def test_agent_runtime_passes_tool_definitions_to_llm():
     received_definitions = []
 
     class InspectingLLM:
-        def decide(
+        async def decide(
             self,
             user_request,
             tool_definitions,

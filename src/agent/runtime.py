@@ -36,7 +36,7 @@ class AgentRuntime:
         tool_results: list[ToolResult] = []
 
         for _ in range(self._max_steps):
-            decision = self._llm.decide(
+            decision = await self._llm.decide(
                 user_request=user_request,
                 tool_definitions=self._tool_definitions,
                 tool_results=tool_results,
