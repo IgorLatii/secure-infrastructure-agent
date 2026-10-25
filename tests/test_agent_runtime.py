@@ -1,7 +1,7 @@
 import pytest
 
 from src.agent.fake_llm import FakeAgentLLM
-from src.agent.models import ToolCall, ToolResult
+from src.agent.models import ToolCall, ToolDefinition, ToolResult
 from src.agent.runtime import AgentRuntime
 
 from mcp.client import Client
@@ -12,6 +12,20 @@ from src.agent.policy.tool_policy import ToolPolicy
 from src.agent.tool_registry import MCPToolRegistry
 from src.agent.tool_schema_validator import ToolSchemaValidator
 
+
+TEST_TOOL_DEFINITIONS = [
+    ToolDefinition(
+        name="get_system_health",
+        description="Get a read-only system health snapshot.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "target": {"type": "string"},
+            },
+            "required": ["target"],
+        },
+    )
+]
 
 class AllowAllSchemaValidator:
     def validate(self, call: ToolCall) -> None:
@@ -26,6 +40,7 @@ async def test_agent_runtime_executes_tool_and_returns_final_response():
         executed_calls.append(call)
 
         return ToolResult(
+            call_id=call.call_id,
             name=call.name,
             content={
                 "target": "LAB-PC",
@@ -41,6 +56,7 @@ async def test_agent_runtime_executes_tool_and_returns_final_response():
             allowed_targets={"LAB-PC"},
         ),
         schema_validator=AllowAllSchemaValidator(),
+        tool_definitions=TEST_TOOL_DEFINITIONS,
     )
 
     response = await runtime.run(
@@ -61,9 +77,11 @@ async def test_agent_runtime_stops_after_max_steps():
         def decide(
             self,
             user_request: str,
+            tool_definitions,
             tool_results: list[ToolResult],
         ) -> ToolCall | str:
             return ToolCall(
+                call_id="test-call-1",
                 name="get_system_health",
                 arguments={"target": "LAB-PC"},
             )
@@ -74,6 +92,7 @@ async def test_agent_runtime_stops_after_max_steps():
         executed_calls.append(call)
 
         return ToolResult(
+            call_id=call.call_id,
             name=call.name,
             content={"target": "LAB-PC"},
         )
@@ -87,6 +106,7 @@ async def test_agent_runtime_stops_after_max_steps():
             allowed_targets={"LAB-PC"},
         ),
         schema_validator=AllowAllSchemaValidator(),
+        tool_definitions=TEST_TOOL_DEFINITIONS,
     )
 
     with pytest.raises(
@@ -110,6 +130,8 @@ async def test_agent_runtime_executes_tool_through_mcp():
 
         schema_validator = ToolSchemaValidator(registry)
 
+        tool_definitions = registry.get_tool_definitions()
+
         runtime = AgentRuntime(
             llm=FakeAgentLLM(),
             tool_executor=mcp_executor.execute,
@@ -118,6 +140,7 @@ async def test_agent_runtime_executes_tool_through_mcp():
                 allowed_targets={"LAB-PC"},
             ),
             schema_validator=schema_validator,
+            tool_definitions=tool_definitions,
         )
 
         response = await runtime.run(
@@ -129,8 +152,9 @@ async def test_agent_runtime_executes_tool_through_mcp():
 @pytest.mark.anyio
 async def test_agent_runtime_blocks_disallowed_tool_before_execution():
     class UnsafeToolLLM:
-        def decide(self, user_request, tool_results):
+        def decide(self, user_request, tool_definitions, tool_results):
             return ToolCall(
+                call_id="test-call-1",
                 name="run_powershell",
                 arguments={
                     "target": "LAB-PC",
@@ -144,6 +168,7 @@ async def test_agent_runtime_blocks_disallowed_tool_before_execution():
         executed_calls.append(call)
 
         return ToolResult(
+            call_id=call.call_id,
             name=call.name,
             content={},
         )
@@ -156,6 +181,7 @@ async def test_agent_runtime_blocks_disallowed_tool_before_execution():
             allowed_targets={"LAB-PC"},
         ),
         schema_validator=AllowAllSchemaValidator(),
+        tool_definitions=TEST_TOOL_DEFINITIONS,
     )
 
     with pytest.raises(
@@ -172,8 +198,9 @@ async def test_agent_runtime_blocks_disallowed_tool_before_execution():
 @pytest.mark.anyio
 async def test_agent_runtime_blocks_disallowed_target_before_execution():
     class DisallowedTargetLLM:
-        def decide(self, user_request, tool_results):
+        def decide(self, user_request, tool_definitions, tool_results):
             return ToolCall(
+                call_id="test-call-1",
                 name="get_system_health",
                 arguments={"target": "DC01"},
             )
@@ -184,6 +211,7 @@ async def test_agent_runtime_blocks_disallowed_target_before_execution():
         executed_calls.append(call)
 
         return ToolResult(
+            call_id=call.call_id,
             name=call.name,
             content={},
         )
@@ -196,6 +224,7 @@ async def test_agent_runtime_blocks_disallowed_target_before_execution():
             allowed_targets={"LAB-PC"},
         ),
         schema_validator=AllowAllSchemaValidator(),
+        tool_definitions=TEST_TOOL_DEFINITIONS,
     )
 
     with pytest.raises(
@@ -211,8 +240,9 @@ async def test_agent_runtime_blocks_disallowed_target_before_execution():
 @pytest.mark.anyio
 async def test_agent_runtime_blocks_unexpected_argument_before_execution():
     class UnexpectedArgumentLLM:
-        def decide(self, user_request, tool_results):
+        def decide(self, user_request, tool_definitions, tool_results):
             return ToolCall(
+                call_id="test-call-1",
                 name="get_system_health",
                 arguments={
                     "target": "LAB-PC",
@@ -226,6 +256,7 @@ async def test_agent_runtime_blocks_unexpected_argument_before_execution():
         executed_calls.append(call)
 
         return ToolResult(
+            call_id=call.call_id,
             name=call.name,
             content={},
         )
@@ -246,6 +277,7 @@ async def test_agent_runtime_blocks_unexpected_argument_before_execution():
                 allowed_targets={"LAB-PC"},
             ),
             schema_validator=schema_validator,
+            tool_definitions=TEST_TOOL_DEFINITIONS,
         )
 
         with pytest.raises(
@@ -257,3 +289,37 @@ async def test_agent_runtime_blocks_unexpected_argument_before_execution():
             )
 
     assert executed_calls == []
+
+
+@pytest.mark.anyio
+async def test_agent_runtime_passes_tool_definitions_to_llm():
+    received_definitions = []
+
+    class InspectingLLM:
+        def decide(
+            self,
+            user_request,
+            tool_definitions,
+            tool_results,
+        ):
+            received_definitions.extend(tool_definitions)
+            return "Done."
+
+    async def fake_tool_executor(call):
+        raise AssertionError("Tool executor should not be called")
+
+    runtime = AgentRuntime(
+        llm=InspectingLLM(),
+        tool_executor=fake_tool_executor,
+        policy=ToolPolicy(
+            allowed_tools={"get_system_health"},
+            allowed_targets={"LAB-PC"},
+        ),
+        schema_validator=AllowAllSchemaValidator(),
+        tool_definitions=TEST_TOOL_DEFINITIONS,
+    )
+
+    result = await runtime.run("Check LAB-PC")
+
+    assert result == "Done."
+    assert received_definitions == TEST_TOOL_DEFINITIONS

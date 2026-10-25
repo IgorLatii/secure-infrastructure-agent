@@ -38,3 +38,21 @@ async def test_registry_rejects_unknown_tool():
             match="Tool schema not found: run_powershell",
         ):
             registry.get_input_schema("run_powershell")
+
+@pytest.mark.anyio
+async def test_registry_exposes_provider_neutral_tool_definitions():
+    mcp_server = create_server()
+
+    async with Client(mcp_server) as client:
+        registry = MCPToolRegistry(client)
+        await registry.load()
+
+        definitions = registry.get_tool_definitions()
+
+    assert len(definitions) == 1
+
+    definition = definitions[0]
+
+    assert definition.name == "get_system_health"
+    assert definition.description is not None
+    assert "target" in definition.input_schema["properties"]

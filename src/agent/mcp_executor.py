@@ -30,6 +30,7 @@ class MCPToolExecutor:
             )
 
         return ToolResult(
+            call_id=call.call_id,
             name=call.name,
             content=content,
         )

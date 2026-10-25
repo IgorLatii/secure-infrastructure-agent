@@ -19,6 +19,7 @@ async def test_schema_validator_accepts_valid_arguments():
         validator = ToolSchemaValidator(registry)
 
         call = ToolCall(
+            call_id="test-call-1",
             name="get_system_health",
             arguments={"target": "LAB-PC"},
         )
@@ -37,6 +38,7 @@ async def test_schema_validator_rejects_missing_required_argument():
         validator = ToolSchemaValidator(registry)
 
         call = ToolCall(
+            call_id="test-call-1",
             name="get_system_health",
             arguments={},
         )
@@ -59,6 +61,7 @@ async def test_schema_validator_rejects_wrong_argument_type():
         validator = ToolSchemaValidator(registry)
 
         call = ToolCall(
+            call_id="test-call-1",
             name="get_system_health",
             arguments={"target": 123},
         )
@@ -80,6 +83,7 @@ async def test_schema_validator_rejects_unexpected_argument():
         validator = ToolSchemaValidator(registry)
 
         call = ToolCall(
+            call_id="test-call-1",
             name="get_system_health",
             arguments={
                 "target": "LAB-PC",

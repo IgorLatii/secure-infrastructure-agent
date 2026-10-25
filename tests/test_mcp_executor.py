@@ -27,6 +27,7 @@ async def test_mcp_tool_executor_calls_mcp_client():
     executor = MCPToolExecutor(client)
 
     call = ToolCall(
+        call_id="test-call-1",
         name="get_system_health",
         arguments={"target": "LAB-PC"},
     )
@@ -37,6 +38,7 @@ async def test_mcp_tool_executor_calls_mcp_client():
         ("get_system_health", {"target": "LAB-PC"})
     ]
 
+    assert result.call_id == "test-call-1"
     assert result.name == "get_system_health"
     assert result.content == {
         "target": "LAB-PC",
@@ -56,6 +58,7 @@ async def test_mcp_tool_executor_rejects_mcp_error():
     executor = MCPToolExecutor(ErrorMCPClient())
 
     call = ToolCall(
+        call_id="test-call-1",
         name="get_system_health",
         arguments={"target": "LAB-PC"},
     )
@@ -80,6 +83,7 @@ async def test_mcp_tool_executor_rejects_missing_structured_content():
     executor = MCPToolExecutor(EmptyMCPClient())
 
     call = ToolCall(
+        call_id="test-call-1",
         name="get_system_health",
         arguments={"target": "LAB-PC"},
     )
