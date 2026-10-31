@@ -11,6 +11,9 @@ from ..models import (
     TopProcesses,
     WindowsEvent,
     WindowsEvents,
+    ScheduledTask,
+    ScheduledTasks,
+    ScheduledTaskAction,
 )
 
 
@@ -122,6 +125,30 @@ class FakeWindowsExecutor(WindowsExecutor):
                             "the running state."
                         ),
                         message_truncated=False,
+                    )
+                ],
+            )
+
+        if operation is WindowsOperation.SCHEDULED_TASKS:
+            if parameters is None:
+                raise ValueError(
+                    "SCHEDULED_TASKS requires parameters"
+                )
+
+            return ScheduledTasks(
+                target=target,
+                tasks=[
+                    ScheduledTask(
+                        task_name="UpdateTelemetry",
+                        task_path="\\",
+                        state="Ready",
+                        enabled=True,
+                        actions=[
+                            ScheduledTaskAction(
+                                execute=r"C:\Program Files\Example\update-helper.exe",
+                                arguments="--background",
+                            )
+                        ],
                     )
                 ],
             )

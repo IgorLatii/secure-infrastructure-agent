@@ -12,3 +12,4 @@ class WindowsOperation(str, Enum):
     TOP_PROCESSES = "top_processes"
     SERVICE_STATUS = "service_status"
     WINDOWS_EVENTS = "windows_events"
+    SCHEDULED_TASKS = "scheduled_tasks"

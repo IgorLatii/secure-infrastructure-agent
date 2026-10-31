@@ -8,6 +8,7 @@ from src.windows_mcp.models import (
     SystemHealth,
     TopProcesses,
     WindowsEvents,
+    ScheduledTasks,
 )
 
 class FakeWindowsTransport(WindowsTransport):
@@ -148,6 +149,105 @@ class FakeSecurityEventsTransport(WindowsTransport):
             ]
         }
         """
+
+class CapturingScheduledTasksTransport(WindowsTransport):
+    def __init__(self):
+        self.script: str | None = None
+
+    def run_powershell(
+        self,
+        target: str,
+        script: str,
+    ) -> str:
+        self.script = script
+
+        return """
+        {
+            "tasks": []
+        }
+        """
+
+class ScheduledTasksTransport(WindowsTransport):
+    def run_powershell(
+        self,
+        target: str,
+        script: str,
+    ) -> str:
+        return """
+        {
+            "tasks": [
+                {
+                    "task_name": "UpdateTelemetry",
+                    "task_path": "\\\\",
+                    "state": "Ready",
+                    "enabled": true,
+                    "actions": [
+                        {
+                            "execute": "C:\\\\Program Files\\\\Example\\\\update-helper.exe",
+                            "arguments": "--background"
+                        }
+                    ]
+                }
+            ]
+        }
+        """
+
+def test_scheduled_tasks_are_parsed_into_structured_evidence():
+    executor = WinRMExecutor(ScheduledTasksTransport())
+
+    result = executor.execute(
+        target="LAB-PC",
+        operation=WindowsOperation.SCHEDULED_TASKS,
+        parameters={
+            "task_name": None,
+            "max_tasks": 20,
+        },
+    )
+
+    assert isinstance(result, ScheduledTasks)
+    assert result.target == "LAB-PC"
+    assert len(result.tasks) == 1
+
+    task = result.tasks[0]
+
+    assert task.task_name == "UpdateTelemetry"
+    assert task.task_path == "\\"
+    assert task.state == "Ready"
+    assert task.enabled is True
+
+    assert len(task.actions) == 1
+
+    action = task.actions[0]
+
+    assert (
+        action.execute
+        == r"C:\Program Files\Example\update-helper.exe"
+    )
+    assert action.arguments == "--background"
+
+
+def test_scheduled_task_name_is_not_interpolated_into_powershell_source():
+    transport = CapturingScheduledTasksTransport()
+    executor = WinRMExecutor(transport)
+
+    malicious_task_name = "'; Stop-Computer -Force; #"
+
+    executor.execute(
+        target="LAB-PC",
+        operation=WindowsOperation.SCHEDULED_TASKS,
+        parameters={
+            "task_name": malicious_task_name,
+            "max_tasks": 20,
+        },
+    )
+
+    assert transport.script is not None
+
+    assert malicious_task_name not in transport.script
+    assert "Stop-Computer" not in transport.script
+
+    assert "FromBase64String" in transport.script
+    assert "ConvertFrom-Json" in transport.script
 
 def test_winrm_executor_preserves_log_always_event_level():
     executor = WinRMExecutor(FakeSecurityEventsTransport())

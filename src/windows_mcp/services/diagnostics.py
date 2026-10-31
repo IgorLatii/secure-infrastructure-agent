@@ -1,6 +1,7 @@
 from ..executors.base import WindowsExecutor
 from ..executors.operations import WindowsOperation
 from ..models import (
+    ScheduledTasks,
     ServiceStatus,
     SystemHealth,
     TopProcesses,
@@ -64,5 +65,20 @@ class DiagnosticService:
                 "event_ids": event_ids,
                 "provider_name": provider_name,
                 "max_events": max_events,
+            },
+        )
+
+    def get_scheduled_tasks(
+            self,
+            target: str,
+            task_name: str | None = None,
+            max_tasks: int = 50,
+    ) -> ScheduledTasks:
+        return self.executor.execute(
+            target=target,
+            operation=WindowsOperation.SCHEDULED_TASKS,
+            parameters={
+                "task_name": task_name,
+                "max_tasks": max_tasks,
             },
         )

@@ -65,3 +65,24 @@ class WindowsEvents:
     log_name: str
     lookback_minutes: int
     events: list[WindowsEvent]
+
+
+@dataclass
+class ScheduledTaskAction:
+    execute: str
+    arguments: str
+
+
+@dataclass
+class ScheduledTask:
+    task_name: str
+    task_path: str
+    state: str
+    enabled: bool
+    actions: list[ScheduledTaskAction]
+
+
+@dataclass
+class ScheduledTasks:
+    target: str
+    tasks: list[ScheduledTask]

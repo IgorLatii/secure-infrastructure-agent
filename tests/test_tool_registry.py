@@ -49,7 +49,7 @@ async def test_registry_exposes_provider_neutral_tool_definitions():
 
         definitions = registry.get_tool_definitions()
 
-    assert len(definitions) == 4
+    assert len(definitions) == 5
 
     events_tool = next(
         definition
@@ -142,3 +142,27 @@ async def test_registry_exposes_provider_neutral_tool_definitions():
 
     assert "target" in service_schema["required"]
     assert "service_name" in service_schema["required"]
+
+    tasks_tool = next(
+        definition
+        for definition in definitions
+        if definition.name == "get_scheduled_tasks"
+    )
+
+    tasks_schema = tasks_tool.input_schema
+
+    assert tasks_schema["required"] == [
+        "target",
+    ]
+
+    tasks_properties = tasks_schema["properties"]
+
+    task_name_schema = tasks_properties["task_name"]["anyOf"][0]
+
+    assert task_name_schema["type"] == "string"
+    assert task_name_schema["minLength"] == 1
+    assert task_name_schema["maxLength"] == 256
+
+    assert tasks_properties["max_tasks"]["minimum"] == 1
+    assert tasks_properties["max_tasks"]["maximum"] == 100
+    assert tasks_properties["max_tasks"]["default"] == 50

@@ -2,6 +2,7 @@ import pytest
 
 from src.windows_mcp.executors.fake import FakeWindowsExecutor
 from src.windows_mcp.models import (
+    ScheduledTasks,
     ServiceStatus,
     SystemHealth,
     TopProcesses,
@@ -91,3 +92,30 @@ def test_get_windows_events_returns_structured_events():
     assert event.record_id == 12345
     assert event.message == "The Windows Time service entered the running state."
     assert event.message_truncated is False
+
+def test_get_scheduled_tasks_returns_structured_tasks():
+    service = DiagnosticService(FakeWindowsExecutor())
+
+    result = service.get_scheduled_tasks(
+        target="LAB-PC",
+        max_tasks=20,
+    )
+
+    assert isinstance(result, ScheduledTasks)
+    assert result.target == "LAB-PC"
+
+    assert len(result.tasks) == 1
+
+    task = result.tasks[0]
+
+    assert task.task_name == "UpdateTelemetry"
+    assert task.task_path == "\\"
+    assert task.state == "Ready"
+    assert task.enabled is True
+
+    assert len(task.actions) == 1
+
+    action = task.actions[0]
+
+    assert action.execute == r"C:\Program Files\Example\update-helper.exe"
+    assert action.arguments == "--background"

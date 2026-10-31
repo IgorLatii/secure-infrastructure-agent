@@ -154,3 +154,42 @@ async def test_mcp_uses_injected_executor():
     assert health is not None
     assert health["target"] == "INJECTED-PC"
     assert health["cpu_percent"] == 87.0
+
+
+@pytest.mark.anyio
+async def test_mcp_calls_scheduled_tasks_tool():
+    server = create_server()
+
+    async with Client(server) as client:
+        result = await client.call_tool(
+            "get_scheduled_tasks",
+            {
+                "target": "LAB-PC",
+                "max_tasks": 20,
+            },
+        )
+
+    assert result.is_error is False
+
+    scheduled_tasks = result.structured_content
+
+    assert scheduled_tasks is not None
+    assert scheduled_tasks["target"] == "LAB-PC"
+
+    assert len(scheduled_tasks["tasks"]) == 1
+
+    task = scheduled_tasks["tasks"][0]
+
+    assert task["task_name"] == "UpdateTelemetry"
+    assert task["task_path"] == "\\"
+    assert task["state"] == "Ready"
+    assert task["enabled"] is True
+    assert len(task["actions"]) == 1
+
+    action = task["actions"][0]
+
+    assert (
+            action["execute"]
+            == r"C:\Program Files\Example\update-helper.exe"
+    )
+    assert action["arguments"] == "--background"
