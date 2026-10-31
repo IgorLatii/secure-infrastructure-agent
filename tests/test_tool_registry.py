@@ -49,7 +49,7 @@ async def test_registry_exposes_provider_neutral_tool_definitions():
 
         definitions = registry.get_tool_definitions()
 
-    assert len(definitions) == 2
+    assert len(definitions) == 3
 
     definitions_by_name = {
         definition.name: definition
@@ -58,6 +58,7 @@ async def test_registry_exposes_provider_neutral_tool_definitions():
 
     assert "get_system_health" in definitions_by_name
     assert "get_top_processes" in definitions_by_name
+    assert "get_service_status" in definitions_by_name
 
     health_definition = definitions_by_name["get_system_health"]
 
@@ -73,3 +74,18 @@ async def test_registry_exposes_provider_neutral_tool_definitions():
         == "string"
     )
     assert "target" in processes_definition.input_schema["required"]
+
+    service_definition = definitions_by_name["get_service_status"]
+
+    assert service_definition.description is not None
+
+    service_schema = service_definition.input_schema
+
+    assert "target" in service_schema["properties"]
+    assert service_schema["properties"]["target"]["type"] == "string"
+
+    assert "service_name" in service_schema["properties"]
+    assert service_schema["properties"]["service_name"]["type"] == "string"
+
+    assert "target" in service_schema["required"]
+    assert "service_name" in service_schema["required"]

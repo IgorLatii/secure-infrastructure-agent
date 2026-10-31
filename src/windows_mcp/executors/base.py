@@ -18,6 +18,7 @@ class WindowsExecutor(ABC):
         self,
         target: str,
         operation: WindowsOperation,
+        parameters: dict[str, Any] | None = None,
     ) -> Any:
         """
         Execute a predefined diagnostic operation against a target.
@@ -25,6 +26,7 @@ class WindowsExecutor(ABC):
         Args:
             target: Logical Windows target name.
             operation: Explicitly supported diagnostic operation.
+            parameters: Operation-specific structured parameters.
 
         Returns:
             Operation-specific diagnostic data.

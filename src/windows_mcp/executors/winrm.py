@@ -1,5 +1,6 @@
 import json
 from typing import Any
+import base64
 
 from .base import WindowsExecutor
 from .operations import WindowsOperation
@@ -7,6 +8,7 @@ from ..models import (
     DiskInfo,
     MemoryInfo,
     ProcessInfo,
+    ServiceStatus,
     SystemHealth,
     TopProcesses,
 )
@@ -29,10 +31,12 @@ class WinRMExecutor(WindowsExecutor):
         self,
         target: str,
         operation: WindowsOperation,
+            parameters: dict[str, Any] | None = None,
     ) -> Any:
         handlers = {
             WindowsOperation.SYSTEM_HEALTH: self._get_system_health,
             WindowsOperation.TOP_PROCESSES: self._get_top_processes,
+            WindowsOperation.SERVICE_STATUS: self._get_service_status,
         }
 
         try:
@@ -42,9 +46,13 @@ class WinRMExecutor(WindowsExecutor):
                 f"Unsupported operation: {operation}"
             ) from None
 
-        return handler(target)
+        return handler(target, parameters)
 
-    def _get_system_health(self, target: str) -> SystemHealth:
+    def _get_system_health(
+            self,
+            target: str,
+            parameters: dict[str, Any] | None = None,
+    ) -> SystemHealth:
         script = r"""
     $os = Get-CimInstance Win32_OperatingSystem
     $cpu = Get-CimInstance Win32_Processor
@@ -118,7 +126,11 @@ class WinRMExecutor(WindowsExecutor):
             pending_reboot=data["pending_reboot"],
         )
 
-    def _get_top_processes(self, target: str) -> TopProcesses:
+    def _get_top_processes(
+            self,
+            target: str,
+            parameters: dict[str, Any] | None = None,
+    ) -> TopProcesses:
         script = r"""
         $logicalCpu = (Get-CimInstance Win32_ComputerSystem).NumberOfLogicalProcessors
 
@@ -186,4 +198,61 @@ class WinRMExecutor(WindowsExecutor):
             target=target,
             top_by_cpu=parse_processes(data["top_by_cpu"]),
             top_by_memory=parse_processes(data["top_by_memory"]),
+        )
+
+    def _get_service_status(
+            self,
+            target: str,
+            parameters: dict[str, Any] | None = None,
+    ) -> ServiceStatus:
+        if parameters is None or "service_name" not in parameters:
+            raise ValueError(
+                "SERVICE_STATUS requires parameter: service_name"
+            )
+
+        service_name = parameters["service_name"]
+
+        if not isinstance(service_name, str) or not service_name:
+            raise ValueError(
+                "service_name must be a non-empty string"
+            )
+
+        encoded_service_name = base64.b64encode(
+            service_name.encode("utf-8")
+        ).decode("ascii")
+
+        script = rf"""
+        $serviceNameBytes = [Convert]::FromBase64String('{encoded_service_name}')
+        $serviceName = [Text.Encoding]::UTF8.GetString($serviceNameBytes)
+
+        $service = Get-CimInstance Win32_Service |
+            Where-Object {{ $_.Name -eq $serviceName }}
+    
+        if ($null -eq $service) {{
+            throw "Service not found"
+        }}
+
+        $result = @{{
+            service_name = $service.Name
+            display_name = $service.DisplayName
+            status = $service.State
+            start_type = $service.StartMode
+        }}
+
+        $result | ConvertTo-Json -Compress
+        """
+
+        raw_output = self._transport.run_powershell(
+            target=target,
+            script=script,
+        )
+
+        data = json.loads(raw_output)
+
+        return ServiceStatus(
+            target=target,
+            service_name=data["service_name"],
+            display_name=data["display_name"],
+            status=data["status"],
+            start_type=data["start_type"],
         )

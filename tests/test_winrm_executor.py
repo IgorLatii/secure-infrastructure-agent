@@ -3,7 +3,7 @@ import pytest
 from src.windows_mcp.executors.operations import WindowsOperation
 from src.windows_mcp.executors.winrm import WinRMExecutor
 from src.windows_mcp.transports.base import WindowsTransport
-from src.windows_mcp.models import SystemHealth, TopProcesses
+from src.windows_mcp.models import ServiceStatus, SystemHealth, TopProcesses
 
 class FakeWindowsTransport(WindowsTransport):
     def run_powershell(
@@ -70,6 +70,41 @@ class FakeProcessWindowsTransport(WindowsTransport):
         }
         """
 
+class FakeServiceWindowsTransport(WindowsTransport):
+    def run_powershell(
+        self,
+        target: str,
+        script: str,
+    ) -> str:
+        return """
+        {
+            "service_name": "W32Time",
+            "display_name": "Windows Time",
+            "status": "Running",
+            "start_type": "Automatic"
+        }
+        """
+
+class CapturingServiceWindowsTransport(WindowsTransport):
+    def __init__(self):
+        self.script: str | None = None
+
+    def run_powershell(
+        self,
+        target: str,
+        script: str,
+    ) -> str:
+        self.script = script
+
+        return """
+        {
+            "service_name": "W32Time",
+            "display_name": "Windows Time",
+            "status": "Running",
+            "start_type": "Automatic"
+        }
+        """
+
 def test_winrm_executor_returns_structured_system_health():
     executor = WinRMExecutor(FakeWindowsTransport())
 
@@ -108,6 +143,23 @@ def test_winrm_executor_returns_structured_top_processes():
     assert result.top_by_memory[0].name == "chrome.exe"
     assert result.top_by_memory[0].memory_mb == 3200.0
 
+def test_winrm_executor_returns_structured_service_status():
+    executor = WinRMExecutor(FakeServiceWindowsTransport())
+
+    result = executor.execute(
+        target="LAB-PC",
+        operation=WindowsOperation.SERVICE_STATUS,
+        parameters={
+            "service_name": "W32Time",
+        },
+    )
+
+    assert isinstance(result, ServiceStatus)
+    assert result.target == "LAB-PC"
+    assert result.service_name == "W32Time"
+    assert result.display_name == "Windows Time"
+    assert result.status == "Running"
+    assert result.start_type == "Automatic"
 
 def test_winrm_executor_rejects_unknown_operation():
     executor = WinRMExecutor(FakeWindowsTransport())
@@ -117,3 +169,24 @@ def test_winrm_executor_rejects_unknown_operation():
             target="LAB-PC",
             operation="delete_everything",
         )
+
+def test_service_name_is_not_interpolated_into_powershell_source():
+    transport = CapturingServiceWindowsTransport()
+    executor = WinRMExecutor(transport)
+
+    malicious_service_name = "'; Stop-Service Spooler; #"
+
+    executor.execute(
+        target="LAB-PC",
+        operation=WindowsOperation.SERVICE_STATUS,
+        parameters={
+            "service_name": malicious_service_name,
+        },
+    )
+
+    assert transport.script is not None
+
+    assert malicious_service_name not in transport.script
+    assert "Stop-Service Spooler" not in transport.script
+
+    assert "FromBase64String" in transport.script

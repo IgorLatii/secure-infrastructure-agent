@@ -1,7 +1,7 @@
 import pytest
 
 from src.windows_mcp.executors.fake import FakeWindowsExecutor
-from src.windows_mcp.models import SystemHealth, TopProcesses
+from src.windows_mcp.models import ServiceStatus, SystemHealth, TopProcesses
 from src.windows_mcp.services.diagnostics import DiagnosticService
 
 
@@ -43,3 +43,18 @@ def test_fake_executor_rejects_unknown_operation():
             target="LAB-PC",
             operation="delete_everything",
         )
+
+def test_get_service_status_returns_structured_status():
+    service = DiagnosticService(FakeWindowsExecutor())
+
+    result = service.get_service_status(
+        target="LAB-PC",
+        service_name="W32Time",
+    )
+
+    assert isinstance(result, ServiceStatus)
+    assert result.target == "LAB-PC"
+    assert result.service_name == "W32Time"
+    assert result.display_name == "Windows Time"
+    assert result.status == "Running"
+    assert result.start_type == "Automatic"

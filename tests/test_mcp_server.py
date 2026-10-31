@@ -18,7 +18,7 @@ async def test_mcp_exposes_diagnostic_tools():
 
     assert "get_system_health" in tool_names
     assert "get_top_processes" in tool_names
-
+    assert "get_service_status" in tool_names
 
 @pytest.mark.anyio
 async def test_mcp_calls_system_health_tool():
@@ -73,6 +73,29 @@ async def test_mcp_calls_top_processes_tool():
     assert top_memory["name"] == "chrome.exe"
     assert top_memory["memory_mb"] == 3200.0
 
+@pytest.mark.anyio
+async def test_mcp_calls_service_status_tool():
+    server = create_server()
+
+    async with Client(server) as client:
+        result = await client.call_tool(
+            "get_service_status",
+            {
+                "target": "LAB-PC",
+                "service_name": "W32Time",
+            },
+        )
+
+    assert result.is_error is False
+
+    service_status = result.structured_content
+
+    assert service_status is not None
+    assert service_status["target"] == "LAB-PC"
+    assert service_status["service_name"] == "W32Time"
+    assert service_status["display_name"] == "Windows Time"
+    assert service_status["status"] == "Running"
+    assert service_status["start_type"] == "Automatic"
 
 @pytest.mark.anyio
 async def test_mcp_uses_injected_executor():

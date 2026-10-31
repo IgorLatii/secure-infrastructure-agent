@@ -6,6 +6,7 @@ from ..models import (
     DiskInfo,
     MemoryInfo,
     ProcessInfo,
+    ServiceStatus,
     SystemHealth,
     TopProcesses,
 )
@@ -23,6 +24,7 @@ class FakeWindowsExecutor(WindowsExecutor):
         self,
         target: str,
         operation: WindowsOperation,
+        parameters: dict[str, Any] | None = None,
     ) -> Any:
         if operation is WindowsOperation.SYSTEM_HEALTH:
             return SystemHealth(
@@ -78,6 +80,22 @@ class FakeWindowsExecutor(WindowsExecutor):
                     key=lambda process: process.memory_mb,
                     reverse=True,
                 ),
+            )
+
+        if operation is WindowsOperation.SERVICE_STATUS:
+            if parameters is None or "service_name" not in parameters:
+                raise ValueError(
+                    "SERVICE_STATUS requires parameter: service_name"
+                )
+
+            service_name = parameters["service_name"]
+
+            return ServiceStatus(
+                target=target,
+                service_name=service_name,
+                display_name="Windows Time",
+                status="Running",
+                start_type="Automatic",
             )
 
         raise ValueError(f"Unsupported operation: {operation}")

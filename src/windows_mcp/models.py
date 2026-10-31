@@ -38,3 +38,12 @@ class TopProcesses:
     target: str
     top_by_cpu: list[ProcessInfo]
     top_by_memory: list[ProcessInfo]
+
+
+@dataclass
+class ServiceStatus:
+    target: str
+    service_name: str   # stable Windows service Name
+    display_name: str   # localized; Unicode string
+    status: str
+    start_type: str
