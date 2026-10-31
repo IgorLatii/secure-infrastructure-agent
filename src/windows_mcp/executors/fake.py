@@ -9,6 +9,8 @@ from ..models import (
     ServiceStatus,
     SystemHealth,
     TopProcesses,
+    WindowsEvent,
+    WindowsEvents,
 )
 
 
@@ -96,6 +98,32 @@ class FakeWindowsExecutor(WindowsExecutor):
                 display_name="Windows Time",
                 status="Running",
                 start_type="Automatic",
+            )
+
+        if operation is WindowsOperation.WINDOWS_EVENTS:
+            if parameters is None:
+                raise ValueError(
+                    "WINDOWS_EVENTS requires parameters"
+                )
+
+            return WindowsEvents(
+                target=target,
+                log_name=parameters["log_name"],
+                lookback_minutes=parameters["lookback_minutes"],
+                events=[
+                    WindowsEvent(
+                        event_id=7036,
+                        provider_name="Service Control Manager",
+                        level="Information",
+                        time_created="2026-10-31T12:00:00Z",
+                        record_id=12345,
+                        message=(
+                            "The Windows Time service entered "
+                            "the running state."
+                        ),
+                        message_truncated=False,
+                    )
+                ],
             )
 
         raise ValueError(f"Unsupported operation: {operation}")

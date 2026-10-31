@@ -1,6 +1,11 @@
 from ..executors.base import WindowsExecutor
 from ..executors.operations import WindowsOperation
-from ..models import ServiceStatus, SystemHealth, TopProcesses
+from ..models import (
+    ServiceStatus,
+    SystemHealth,
+    TopProcesses,
+    WindowsEvents,
+)
 
 
 class DiagnosticService:
@@ -36,5 +41,28 @@ class DiagnosticService:
             operation=WindowsOperation.SERVICE_STATUS,
             parameters={
                 "service_name": service_name,
+            },
+        )
+
+    def get_windows_events(
+            self,
+            target: str,
+            log_name: str,
+            lookback_minutes: int,
+            levels: list[str] | None = None,
+            event_ids: list[int] | None = None,
+            provider_name: str | None = None,
+            max_events: int = 50,
+    ) -> WindowsEvents:
+        return self.executor.execute(
+            target=target,
+            operation=WindowsOperation.WINDOWS_EVENTS,
+            parameters={
+                "log_name": log_name,
+                "lookback_minutes": lookback_minutes,
+                "levels": levels,
+                "event_ids": event_ids,
+                "provider_name": provider_name,
+                "max_events": max_events,
             },
         )

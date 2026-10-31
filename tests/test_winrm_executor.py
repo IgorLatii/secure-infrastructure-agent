@@ -3,7 +3,12 @@ import pytest
 from src.windows_mcp.executors.operations import WindowsOperation
 from src.windows_mcp.executors.winrm import WinRMExecutor
 from src.windows_mcp.transports.base import WindowsTransport
-from src.windows_mcp.models import ServiceStatus, SystemHealth, TopProcesses
+from src.windows_mcp.models import (
+    ServiceStatus,
+    SystemHealth,
+    TopProcesses,
+    WindowsEvents,
+)
 
 class FakeWindowsTransport(WindowsTransport):
     def run_powershell(
@@ -104,6 +109,145 @@ class CapturingServiceWindowsTransport(WindowsTransport):
             "start_type": "Automatic"
         }
         """
+
+class CapturingWindowsEventsTransport(WindowsTransport):
+    def __init__(self):
+        self.script: str | None = None
+
+    def run_powershell(
+        self,
+        target: str,
+        script: str,
+    ) -> str:
+        self.script = script
+
+        return """
+        {
+            "events": []
+        }
+        """
+
+class FakeSecurityEventsTransport(WindowsTransport):
+    def run_powershell(
+        self,
+        target: str,
+        script: str,
+    ) -> str:
+        return """
+        {
+            "events": [
+                {
+                    "event_id": 4624,
+                    "provider_name": "Microsoft-Windows-Security-Auditing",
+                    "level": "LogAlways",
+                    "time_created": "2026-10-31T19:40:26Z",
+                    "record_id": 415,
+                    "message": "An account was successfully logged on.",
+                    "message_truncated": false
+                }
+            ]
+        }
+        """
+
+def test_winrm_executor_preserves_log_always_event_level():
+    executor = WinRMExecutor(FakeSecurityEventsTransport())
+
+    result = executor.execute(
+        target="LAB-PC",
+        operation=WindowsOperation.WINDOWS_EVENTS,
+        parameters={
+            "log_name": "Security",
+            "lookback_minutes": 60,
+            "max_events": 10,
+        },
+    )
+
+    assert len(result.events) == 1
+    assert result.events[0].event_id == 4624
+    assert result.events[0].level == "LogAlways"
+
+def test_windows_event_provider_is_not_interpolated_into_powershell_source():
+    transport = CapturingWindowsEventsTransport()
+    executor = WinRMExecutor(transport)
+
+    malicious_provider = "'; Stop-Computer -Force; #"
+
+    executor.execute(
+        target="LAB-PC",
+        operation=WindowsOperation.WINDOWS_EVENTS,
+        parameters={
+            "log_name": "System",
+            "lookback_minutes": 60,
+            "provider_name": malicious_provider,
+            "max_events": 20,
+        },
+    )
+
+    assert transport.script is not None
+
+    assert malicious_provider not in transport.script
+    assert "Stop-Computer" not in transport.script
+
+    assert "FromBase64String" in transport.script
+    assert "ConvertFrom-Json" in transport.script
+
+class FakeWindowsEventsTransport(WindowsTransport):
+    def run_powershell(
+        self,
+        target: str,
+        script: str,
+    ) -> str:
+        return """
+        {
+            "events": [
+                {
+                    "event_id": 7036,
+                    "provider_name": "Service Control Manager",
+                    "level": "Information",
+                    "time_created": "2026-10-31T12:00:00Z",
+                    "record_id": 12345,
+                    "message": "The Windows Time service entered the running state.",
+                    "message_truncated": false
+                }
+            ]
+        }
+        """
+
+def test_winrm_executor_returns_structured_windows_events():
+    executor = WinRMExecutor(FakeWindowsEventsTransport())
+
+    result = executor.execute(
+        target="LAB-PC",
+        operation=WindowsOperation.WINDOWS_EVENTS,
+        parameters={
+            "log_name": "System",
+            "lookback_minutes": 60,
+            "levels": ["Information"],
+            "event_ids": [7036],
+            "provider_name": "Service Control Manager",
+            "max_events": 20,
+        },
+    )
+
+    assert isinstance(result, WindowsEvents)
+    assert result.target == "LAB-PC"
+    assert result.log_name == "System"
+    assert result.lookback_minutes == 60
+
+    assert len(result.events) == 1
+
+    event = result.events[0]
+
+    assert event.event_id == 7036
+    assert event.provider_name == "Service Control Manager"
+    assert event.level == "Information"
+    assert event.time_created == "2026-10-31T12:00:00Z"
+    assert event.record_id == 12345
+    assert (
+        event.message
+        == "The Windows Time service entered the running state."
+    )
+    assert event.message_truncated is False
 
 def test_winrm_executor_returns_structured_system_health():
     executor = WinRMExecutor(FakeWindowsTransport())

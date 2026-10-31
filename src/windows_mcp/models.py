@@ -47,3 +47,21 @@ class ServiceStatus:
     display_name: str   # localized; Unicode string
     status: str
     start_type: str
+
+@dataclass
+class WindowsEvent:
+    event_id: int
+    provider_name: str
+    level: str
+    time_created: str
+    record_id: int
+    message: str
+    message_truncated: bool
+
+
+@dataclass
+class WindowsEvents:
+    target: str
+    log_name: str
+    lookback_minutes: int
+    events: list[WindowsEvent]

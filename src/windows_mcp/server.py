@@ -6,6 +6,7 @@ from .services.diagnostics import DiagnosticService
 from .tools.health import register_health_tools
 from .tools.processes import register_process_tools
 from .tools.services import register_service_tools
+from .tools.events import register_event_tools
 
 
 def create_server(
@@ -39,6 +40,11 @@ def create_server(
     register_service_tools(
         mcp=mcp,
         diagnostics=diagnostics,
+    )
+
+    register_event_tools(
+        mcp=mcp,
+        diagnostics=diagnostics
     )
 
     return mcp

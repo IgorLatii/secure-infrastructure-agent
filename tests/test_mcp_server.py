@@ -19,6 +19,7 @@ async def test_mcp_exposes_diagnostic_tools():
     assert "get_system_health" in tool_names
     assert "get_top_processes" in tool_names
     assert "get_service_status" in tool_names
+    assert "get_windows_events" in tool_names
 
 @pytest.mark.anyio
 async def test_mcp_calls_system_health_tool():
@@ -96,6 +97,46 @@ async def test_mcp_calls_service_status_tool():
     assert service_status["display_name"] == "Windows Time"
     assert service_status["status"] == "Running"
     assert service_status["start_type"] == "Automatic"
+
+@pytest.mark.anyio
+async def test_mcp_calls_windows_events_tool():
+    server = create_server()
+
+    async with Client(server) as client:
+        result = await client.call_tool(
+            "get_windows_events",
+            {
+                "target": "LAB-PC",
+                "log_name": "System",
+                "lookback_minutes": 60,
+                "levels": ["Information"],
+                "max_events": 20,
+            },
+        )
+
+    assert result.is_error is False
+
+    windows_events = result.structured_content
+
+    assert windows_events is not None
+    assert windows_events["target"] == "LAB-PC"
+    assert windows_events["log_name"] == "System"
+    assert windows_events["lookback_minutes"] == 60
+
+    assert len(windows_events["events"]) == 1
+
+    event = windows_events["events"][0]
+
+    assert event["event_id"] == 7036
+    assert event["provider_name"] == "Service Control Manager"
+    assert event["level"] == "Information"
+    assert event["time_created"] == "2026-10-31T12:00:00Z"
+    assert event["record_id"] == 12345
+    assert (
+        event["message"]
+        == "The Windows Time service entered the running state."
+    )
+    assert event["message_truncated"] is False
 
 @pytest.mark.anyio
 async def test_mcp_uses_injected_executor():

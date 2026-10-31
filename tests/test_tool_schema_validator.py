@@ -96,3 +96,98 @@ async def test_schema_validator_rejects_unexpected_argument():
                 match="Unexpected arguments",
         ):
             validator.validate(call)
+
+@pytest.mark.anyio
+async def test_schema_validator_rejects_invalid_event_id():
+    server = create_server()
+
+    async with Client(server) as client:
+        registry = MCPToolRegistry(client)
+        await registry.load()
+
+        validator = ToolSchemaValidator(registry)
+
+        call = ToolCall(
+            call_id="test-call-events-1",
+            name="get_windows_events",
+            arguments={
+                "target": "LAB-PC",
+                "log_name": "System",
+                "lookback_minutes": 60,
+                "event_ids": [0, 41],
+            },
+        )
+
+        with pytest.raises(
+            ValueError,
+            match="Invalid arguments",
+        ):
+            validator.validate(call)
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "invalid_arguments",
+    [
+        {
+            "target": "LAB-PC",
+            "log_name": "UnknownLog",
+            "lookback_minutes": 60,
+        },
+        {
+            "target": "LAB-PC",
+            "log_name": "System",
+            "lookback_minutes": 0,
+        },
+        {
+            "target": "LAB-PC",
+            "log_name": "System",
+            "lookback_minutes": 10081,
+        },
+        {
+            "target": "LAB-PC",
+            "log_name": "System",
+            "lookback_minutes": 60,
+            "levels": ["InvalidLevel"],
+        },
+        {
+            "target": "LAB-PC",
+            "log_name": "System",
+            "lookback_minutes": 60,
+            "event_ids": list(range(1, 22)),
+        },
+        {
+            "target": "LAB-PC",
+            "log_name": "System",
+            "lookback_minutes": 60,
+            "provider_name": "A" * 257,
+        },
+        {
+            "target": "LAB-PC",
+            "log_name": "System",
+            "lookback_minutes": 60,
+            "max_events": 101,
+        },
+    ],
+)
+async def test_schema_validator_rejects_out_of_bounds_windows_event_arguments(
+    invalid_arguments,
+):
+    server = create_server()
+
+    async with Client(server) as client:
+        registry = MCPToolRegistry(client)
+        await registry.load()
+
+        validator = ToolSchemaValidator(registry)
+
+        call = ToolCall(
+            call_id="test-call-events-bounds",
+            name="get_windows_events",
+            arguments=invalid_arguments,
+        )
+
+        with pytest.raises(
+            ValueError,
+            match="Invalid arguments",
+        ):
+            validator.validate(call)

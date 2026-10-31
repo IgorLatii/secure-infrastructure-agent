@@ -49,7 +49,60 @@ async def test_registry_exposes_provider_neutral_tool_definitions():
 
         definitions = registry.get_tool_definitions()
 
-    assert len(definitions) == 3
+    assert len(definitions) == 4
+
+    events_tool = next(
+        definition
+        for definition in definitions
+        if definition.name == "get_windows_events"
+    )
+
+    schema = events_tool.input_schema
+
+    assert schema["required"] == [
+        "target",
+        "log_name",
+        "lookback_minutes",
+    ]
+
+    properties = schema["properties"]
+
+    assert properties["log_name"]["enum"] == [
+        "System",
+        "Application",
+        "Security",
+    ]
+
+    assert properties["lookback_minutes"]["minimum"] == 1
+    assert properties["lookback_minutes"]["maximum"] == 10080
+
+    assert properties["max_events"]["minimum"] == 1
+    assert properties["max_events"]["maximum"] == 100
+
+    levels_schema = properties["levels"]["anyOf"][0]
+
+    assert levels_schema["type"] == "array"
+    assert levels_schema["maxItems"] == 6
+    assert levels_schema["items"]["enum"] == [
+        "LogAlways",
+        "Critical",
+        "Error",
+        "Warning",
+        "Information",
+        "Verbose",
+    ]
+
+    event_ids_schema = properties["event_ids"]["anyOf"][0]
+
+    assert event_ids_schema["type"] == "array"
+    assert event_ids_schema["maxItems"] == 20
+    assert event_ids_schema["items"]["type"] == "integer"
+    assert event_ids_schema["items"]["exclusiveMinimum"] == 0
+
+    provider_schema = properties["provider_name"]["anyOf"][0]
+
+    assert provider_schema["type"] == "string"
+    assert provider_schema["maxLength"] == 256
 
     definitions_by_name = {
         definition.name: definition

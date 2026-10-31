@@ -1,7 +1,12 @@
 import pytest
 
 from src.windows_mcp.executors.fake import FakeWindowsExecutor
-from src.windows_mcp.models import ServiceStatus, SystemHealth, TopProcesses
+from src.windows_mcp.models import (
+    ServiceStatus,
+    SystemHealth,
+    TopProcesses,
+    WindowsEvents,
+)
 from src.windows_mcp.services.diagnostics import DiagnosticService
 
 
@@ -58,3 +63,31 @@ def test_get_service_status_returns_structured_status():
     assert result.display_name == "Windows Time"
     assert result.status == "Running"
     assert result.start_type == "Automatic"
+
+def test_get_windows_events_returns_structured_events():
+    service = DiagnosticService(FakeWindowsExecutor())
+
+    result = service.get_windows_events(
+        target="LAB-PC",
+        log_name="System",
+        lookback_minutes=60,
+        levels=["Information"],
+        max_events=20,
+    )
+
+    assert isinstance(result, WindowsEvents)
+    assert result.target == "LAB-PC"
+    assert result.log_name == "System"
+    assert result.lookback_minutes == 60
+
+    assert len(result.events) == 1
+
+    event = result.events[0]
+
+    assert event.event_id == 7036
+    assert event.provider_name == "Service Control Manager"
+    assert event.level == "Information"
+    assert event.time_created == "2026-10-31T12:00:00Z"
+    assert event.record_id == 12345
+    assert event.message == "The Windows Time service entered the running state."
+    assert event.message_truncated is False
