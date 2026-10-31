@@ -4,6 +4,7 @@ from .executors.base import WindowsExecutor
 from .executors.fake import FakeWindowsExecutor
 from .services.diagnostics import DiagnosticService
 from .tools.health import register_health_tools
+from .tools.processes import register_process_tools
 
 
 def create_server(
@@ -25,6 +26,11 @@ def create_server(
     )
 
     register_health_tools(
+        mcp=mcp,
+        diagnostics=diagnostics,
+    )
+
+    register_process_tools(
         mcp=mcp,
         diagnostics=diagnostics,
     )

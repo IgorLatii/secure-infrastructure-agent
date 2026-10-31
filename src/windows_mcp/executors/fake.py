@@ -2,7 +2,13 @@ from typing import Any
 
 from .base import WindowsExecutor
 from .operations import WindowsOperation
-from ..models import DiskInfo, MemoryInfo, SystemHealth
+from ..models import (
+    DiskInfo,
+    MemoryInfo,
+    ProcessInfo,
+    SystemHealth,
+    TopProcesses,
+)
 
 
 class FakeWindowsExecutor(WindowsExecutor):
@@ -36,6 +42,42 @@ class FakeWindowsExecutor(WindowsExecutor):
                     )
                 ],
                 pending_reboot=False,
+            )
+
+        if operation is WindowsOperation.TOP_PROCESSES:
+            processes = [
+                ProcessInfo(
+                    name="chrome.exe",
+                    pid=4120,
+                    cpu_percent=42.0,
+                    memory_mb=3200.0,
+                ),
+                ProcessInfo(
+                    name="Teams.exe",
+                    pid=5184,
+                    cpu_percent=18.0,
+                    memory_mb=1450.0,
+                ),
+                ProcessInfo(
+                    name="explorer.exe",
+                    pid=2260,
+                    cpu_percent=2.0,
+                    memory_mb=180.0,
+                ),
+            ]
+
+            return TopProcesses(
+                target=target,
+                top_by_cpu=sorted(
+                    processes,
+                    key=lambda process: process.cpu_percent,
+                    reverse=True,
+                ),
+                top_by_memory=sorted(
+                    processes,
+                    key=lambda process: process.memory_mb,
+                    reverse=True,
+                ),
             )
 
         raise ValueError(f"Unsupported operation: {operation}")

@@ -1,6 +1,6 @@
 from ..executors.base import WindowsExecutor
 from ..executors.operations import WindowsOperation
-from ..models import SystemHealth
+from ..models import SystemHealth, TopProcesses
 
 
 class DiagnosticService:
@@ -18,4 +18,10 @@ class DiagnosticService:
         return self.executor.execute(
             target=target,
             operation=WindowsOperation.SYSTEM_HEALTH,
+        )
+
+    def get_top_processes(self, target: str) -> TopProcesses:
+        return self.executor.execute(
+            target=target,
+            operation=WindowsOperation.TOP_PROCESSES,
         )

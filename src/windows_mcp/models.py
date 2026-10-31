@@ -23,3 +23,18 @@ class SystemHealth:
     memory: MemoryInfo
     disks: list[DiskInfo]
     pending_reboot: bool
+
+
+@dataclass
+class ProcessInfo:
+    name: str
+    pid: int
+    cpu_percent: float
+    memory_mb: float
+
+
+@dataclass
+class TopProcesses:
+    target: str
+    top_by_cpu: list[ProcessInfo]
+    top_by_memory: list[ProcessInfo]

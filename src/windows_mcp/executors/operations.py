@@ -9,3 +9,4 @@ class WindowsOperation(str, Enum):
     """
 
     SYSTEM_HEALTH = "system_health"
+    TOP_PROCESSES = "top_processes"

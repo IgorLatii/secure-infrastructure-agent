@@ -8,7 +8,7 @@ from src.windows_mcp.server import create_server
 
 
 @pytest.mark.anyio
-async def test_mcp_exposes_system_health_tool():
+async def test_mcp_exposes_diagnostic_tools():
     server = create_server()
 
     async with Client(server) as client:
@@ -17,6 +17,7 @@ async def test_mcp_exposes_system_health_tool():
     tool_names = [tool.name for tool in result.tools]
 
     assert "get_system_health" in tool_names
+    assert "get_top_processes" in tool_names
 
 
 @pytest.mark.anyio
@@ -39,6 +40,38 @@ async def test_mcp_calls_system_health_tool():
     assert health["memory"]["used_percent"] == 88.75
     assert health["disks"][0]["drive"] == "C:"
     assert health["pending_reboot"] is False
+
+@pytest.mark.anyio
+async def test_mcp_calls_top_processes_tool():
+    server = create_server()
+
+    async with Client(server) as client:
+        result = await client.call_tool(
+            "get_top_processes",
+            {"target": "LAB-PC"},
+        )
+
+    assert result.is_error is False
+
+    top_processes = result.structured_content
+
+    assert top_processes is not None
+    assert top_processes["target"] == "LAB-PC"
+
+    assert len(top_processes["top_by_cpu"]) == 3
+    assert len(top_processes["top_by_memory"]) == 3
+
+    top_cpu = top_processes["top_by_cpu"][0]
+
+    assert top_cpu["name"] == "chrome.exe"
+    assert top_cpu["pid"] == 4120
+    assert top_cpu["cpu_percent"] == 42.0
+    assert top_cpu["memory_mb"] == 3200.0
+
+    top_memory = top_processes["top_by_memory"][0]
+
+    assert top_memory["name"] == "chrome.exe"
+    assert top_memory["memory_mb"] == 3200.0
 
 
 @pytest.mark.anyio
