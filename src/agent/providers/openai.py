@@ -40,9 +40,22 @@ class OpenAIAgentLLM(AgentLLM):
             input=input_data,
             tools=build_openai_tools(tool_definitions),
             previous_response_id=self._previous_response_id,
+            parallel_tool_calls=False,
         )
 
         self._previous_response_id = response.id
+
+        print(
+            "OpenAI response output:",
+            [
+                (
+                    item.type,
+                    getattr(item, "name", None),
+                    getattr(item, "call_id", None),
+                )
+                for item in response.output
+            ],
+        )
 
         for item in response.output:
             if item.type == "function_call":

@@ -12,7 +12,6 @@ from src.agent.policy.tool_policy import ToolPolicy
 from src.agent.tool_registry import MCPToolRegistry
 from src.agent.tool_schema_validator import ToolSchemaValidator
 
-
 TEST_TOOL_DEFINITIONS = [
     ToolDefinition(
         name="get_system_health",
@@ -24,8 +23,20 @@ TEST_TOOL_DEFINITIONS = [
             },
             "required": ["target"],
         },
-    )
+    ),
+    ToolDefinition(
+        name="get_top_processes",
+        description="Get top resource-consuming processes.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "target": {"type": "string"},
+            },
+            "required": ["target"],
+        },
+    ),
 ]
+
 
 class AllowAllSchemaValidator:
     def validate(self, call: ToolCall) -> None:
@@ -71,14 +82,15 @@ async def test_agent_runtime_executes_tool_and_returns_final_response():
         "target": "LAB-PC",
     }
 
+
 @pytest.mark.anyio
 async def test_agent_runtime_stops_after_max_steps():
     class EndlessToolLLM(FakeAgentLLM):
         async def decide(
-            self,
-            user_request: str,
-            tool_definitions,
-            tool_results: list[ToolResult],
+                self,
+                user_request: str,
+                tool_definitions,
+                tool_results: list[ToolResult],
         ) -> ToolCall | str:
             return ToolCall(
                 call_id="test-call-1",
@@ -110,8 +122,8 @@ async def test_agent_runtime_stops_after_max_steps():
     )
 
     with pytest.raises(
-        RuntimeError,
-        match="Agent exceeded maximum number of steps: 3",
+            RuntimeError,
+            match="Agent exceeded maximum number of steps: 3",
     ):
         await runtime.run("Почему LAB-PC тормозит?")
 
@@ -149,6 +161,7 @@ async def test_agent_runtime_executes_tool_through_mcp():
 
     assert response == "System health evidence received."
 
+
 @pytest.mark.anyio
 async def test_agent_runtime_blocks_disallowed_tool_before_execution():
     class UnsafeToolLLM:
@@ -185,8 +198,8 @@ async def test_agent_runtime_blocks_disallowed_tool_before_execution():
     )
 
     with pytest.raises(
-        PermissionError,
-        match="Tool is not allowed by policy: run_powershell",
+            PermissionError,
+            match="Tool is not allowed by policy: run_powershell",
     ):
         await runtime.run(
             "Run PowerShell on LAB-PC"
@@ -228,14 +241,15 @@ async def test_agent_runtime_blocks_disallowed_target_before_execution():
     )
 
     with pytest.raises(
-        PermissionError,
-        match="Target is not allowed by policy: DC01",
+            PermissionError,
+            match="Target is not allowed by policy: DC01",
     ):
         await runtime.run(
             "Check system health on DC01"
         )
 
     assert executed_calls == []
+
 
 @pytest.mark.anyio
 async def test_agent_runtime_blocks_unexpected_argument_before_execution():
@@ -281,8 +295,8 @@ async def test_agent_runtime_blocks_unexpected_argument_before_execution():
         )
 
         with pytest.raises(
-            ValueError,
-            match="Unexpected arguments",
+                ValueError,
+                match="Unexpected arguments",
         ):
             await runtime.run(
                 "Check LAB-PC and execute this extra script"
@@ -297,10 +311,10 @@ async def test_agent_runtime_passes_tool_definitions_to_llm():
 
     class InspectingLLM:
         async def decide(
-            self,
-            user_request,
-            tool_definitions,
-            tool_results,
+                self,
+                user_request,
+                tool_definitions,
+                tool_results,
         ):
             received_definitions.extend(tool_definitions)
             return "Done."
@@ -323,3 +337,170 @@ async def test_agent_runtime_passes_tool_definitions_to_llm():
 
     assert result == "Done."
     assert received_definitions == TEST_TOOL_DEFINITIONS
+
+
+@pytest.mark.anyio
+async def test_agent_runtime_performs_multi_step_diagnosis():
+    class MultiStepDiagnosticLLM:
+        async def decide(
+                self,
+                user_request,
+                tool_definitions,
+                tool_results,
+        ):
+            if not tool_results:
+                return ToolCall(
+                    call_id="health-call",
+                    name="get_system_health",
+                    arguments={"target": "LAB-PC"},
+                )
+
+            if len(tool_results) == 1:
+                assert tool_results[0].name == "get_system_health"
+
+                return ToolCall(
+                    call_id="process-call",
+                    name="get_top_processes",
+                    arguments={"target": "LAB-PC"},
+                )
+
+            assert tool_results[1].name == "get_top_processes"
+
+            return "High CPU and memory usage are associated with chrome.exe."
+
+    executed_calls: list[ToolCall] = []
+
+    async def fake_tool_executor(call: ToolCall) -> ToolResult:
+        executed_calls.append(call)
+
+        if call.name == "get_system_health":
+            return ToolResult(
+                call_id=call.call_id,
+                name=call.name,
+                content={
+                    "target": "LAB-PC",
+                    "cpu_percent": 87.0,
+                    "memory": {
+                        "used_percent": 88.75,
+                    },
+                },
+            )
+
+        if call.name == "get_top_processes":
+            return ToolResult(
+                call_id=call.call_id,
+                name=call.name,
+                content={
+                    "target": "LAB-PC",
+                    "top_by_cpu": [
+                        {
+                            "name": "chrome.exe",
+                            "pid": 4120,
+                            "cpu_percent": 42.0,
+                            "memory_mb": 3200.0,
+                        }
+                    ],
+                    "top_by_memory": [
+                        {
+                            "name": "chrome.exe",
+                            "pid": 4120,
+                            "cpu_percent": 42.0,
+                            "memory_mb": 3200.0,
+                        }
+                    ],
+                },
+            )
+
+        raise AssertionError(
+            f"Unexpected tool call: {call.name}"
+        )
+
+    runtime = AgentRuntime(
+        llm=MultiStepDiagnosticLLM(),
+        tool_executor=fake_tool_executor,
+        policy=ToolPolicy(
+            allowed_tools={
+                "get_system_health",
+                "get_top_processes",
+            },
+            allowed_targets={"LAB-PC"},
+        ),
+        schema_validator=AllowAllSchemaValidator(),
+        tool_definitions=TEST_TOOL_DEFINITIONS,
+    )
+
+    response = await runtime.run(
+        "Почему LAB-PC тормозит?"
+    )
+
+    assert response == (
+        "High CPU and memory usage are associated with chrome.exe."
+    )
+
+    assert [call.name for call in executed_calls] == [
+        "get_system_health",
+        "get_top_processes",
+    ]
+
+
+@pytest.mark.anyio
+async def test_agent_runtime_performs_multi_step_diagnosis_through_mcp():
+    class MultiStepDiagnosticLLM:
+        async def decide(
+                self,
+                user_request,
+                tool_definitions,
+                tool_results,
+        ):
+            if not tool_results:
+                return ToolCall(
+                    call_id="health-call",
+                    name="get_system_health",
+                    arguments={"target": "LAB-PC"},
+                )
+
+            if len(tool_results) == 1:
+                assert tool_results[0].name == "get_system_health"
+                assert tool_results[0].content["cpu_percent"] == 87.0
+
+                return ToolCall(
+                    call_id="process-call",
+                    name="get_top_processes",
+                    arguments={"target": "LAB-PC"},
+                )
+
+            assert tool_results[1].name == "get_top_processes"
+            assert (
+                    tool_results[1].content["top_by_cpu"][0]["name"]
+                    == "chrome.exe"
+            )
+
+            return "Multi-step diagnosis complete."
+
+    mcp_server = create_server()
+
+    async with Client(mcp_server) as client:
+        mcp_executor = MCPToolExecutor(client)
+
+        registry = MCPToolRegistry(client)
+        await registry.load()
+
+        runtime = AgentRuntime(
+            llm=MultiStepDiagnosticLLM(),
+            tool_executor=mcp_executor.execute,
+            policy=ToolPolicy(
+                allowed_tools={
+                    "get_system_health",
+                    "get_top_processes",
+                },
+                allowed_targets={"LAB-PC"},
+            ),
+            schema_validator=ToolSchemaValidator(registry),
+            tool_definitions=registry.get_tool_definitions(),
+        )
+
+        response = await runtime.run(
+            "Почему LAB-PC тормозит?"
+        )
+
+    assert response == "Multi-step diagnosis complete."
