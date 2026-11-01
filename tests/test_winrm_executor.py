@@ -9,6 +9,7 @@ from src.windows_mcp.models import (
     TopProcesses,
     WindowsEvents,
     ScheduledTasks,
+    StartupEntries,
 )
 
 class FakeWindowsTransport(WindowsTransport):
@@ -191,6 +192,79 @@ class ScheduledTasksTransport(WindowsTransport):
             ]
         }
         """
+
+class StartupEntriesTransport(WindowsTransport):
+    def run_powershell(
+        self,
+        target: str,
+        script: str,
+    ) -> str:
+        return """
+        {
+            "entries": [
+                {
+                    "name": "UpdateHelper",
+                    "command": "C:\\\\Program Files\\\\Example\\\\update-helper.exe --background",
+                    "location": "HKLM\\\\Software\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\Run",
+                    "scope": "Machine",
+                    "user_sid": null
+                },
+                {
+                    "name": "UserHelper",
+                    "command": "C:\\\\Users\\\\Example\\\\AppData\\\\Local\\\\user-helper.exe",
+                    "location": "HKU\\\\S-1-5-21-111-222-333-1001\\\\Software\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\Run",
+                    "scope": "User",
+                    "user_sid": "S-1-5-21-111-222-333-1001"
+                }
+            ]
+        }
+        """
+
+def test_startup_entries_are_parsed_into_structured_evidence():
+    executor = WinRMExecutor(StartupEntriesTransport())
+
+    result = executor.execute(
+        target="LAB-PC",
+        operation=WindowsOperation.STARTUP_ENTRIES,
+        parameters={
+            "max_entries": 20,
+        },
+    )
+
+    assert isinstance(result, StartupEntries)
+    assert result.target == "LAB-PC"
+    assert len(result.entries) == 2
+
+    entry = result.entries[0]
+
+    assert entry.name == "UpdateHelper"
+    assert (
+        entry.command
+        == r"C:\Program Files\Example\update-helper.exe --background"
+    )
+    assert (
+        entry.location
+        == r"HKLM\Software\Microsoft\Windows\CurrentVersion\Run"
+    )
+    assert entry.scope == "Machine"
+    assert entry.user_sid is None
+
+    user_entry = result.entries[1]
+
+    assert user_entry.name == "UserHelper"
+    assert (
+            user_entry.command
+            == r"C:\Users\Example\AppData\Local\user-helper.exe"
+    )
+    assert user_entry.scope == "User"
+    assert user_entry.user_sid == "S-1-5-21-111-222-333-1001"
+    assert (
+            user_entry.location
+            == (
+                r"HKU\S-1-5-21-111-222-333-1001"
+                r"\Software\Microsoft\Windows\CurrentVersion\Run"
+            )
+    )
 
 def test_scheduled_tasks_are_parsed_into_structured_evidence():
     executor = WinRMExecutor(ScheduledTasksTransport())
@@ -434,3 +508,36 @@ def test_service_name_is_not_interpolated_into_powershell_source():
     assert "Stop-Service Spooler" not in transport.script
 
     assert "FromBase64String" in transport.script
+
+def test_startup_entries_rejects_invalid_max_entries():
+    executor = WinRMExecutor(ScheduledTasksTransport())
+
+    with pytest.raises(
+        ValueError,
+        match="max_entries must be an integer between 1 and 100",
+    ):
+        executor.execute(
+            target="LAB-PC",
+            operation=WindowsOperation.STARTUP_ENTRIES,
+            parameters={
+                "max_entries": 101,
+            },
+        )
+
+@pytest.mark.parametrize(
+    "invalid_max_entries",
+    [True, False, 0, 101, 1.5, "50"],
+)
+def test_startup_entries_rejects_invalid_max_entries_types(
+        invalid_max_entries,
+):
+    executor = WinRMExecutor(ScheduledTasksTransport())
+
+    with pytest.raises(ValueError):
+        executor.execute(
+            target="LAB-PC",
+            operation=WindowsOperation.STARTUP_ENTRIES,
+            parameters={
+                "max_entries": invalid_max_entries,
+            },
+        )

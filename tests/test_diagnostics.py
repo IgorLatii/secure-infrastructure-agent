@@ -7,6 +7,7 @@ from src.windows_mcp.models import (
     SystemHealth,
     TopProcesses,
     WindowsEvents,
+    StartupEntries,
 )
 from src.windows_mcp.services.diagnostics import DiagnosticService
 
@@ -119,3 +120,30 @@ def test_get_scheduled_tasks_returns_structured_tasks():
 
     assert action.execute == r"C:\Program Files\Example\update-helper.exe"
     assert action.arguments == "--background"
+
+
+def test_get_startup_entries_returns_structured_entries():
+    service = DiagnosticService(FakeWindowsExecutor())
+
+    result = service.get_startup_entries(
+        target="LAB-PC",
+        max_entries=20,
+    )
+
+    assert isinstance(result, StartupEntries)
+    assert result.target == "LAB-PC"
+    assert len(result.entries) == 1
+
+    entry = result.entries[0]
+
+    assert entry.name == "UpdateHelper"
+    assert (
+        entry.command
+        == r"C:\Program Files\Example\update-helper.exe --background"
+    )
+    assert (
+        entry.location
+        == r"HKLM\Software\Microsoft\Windows\CurrentVersion\Run"
+    )
+    assert entry.scope == "Machine"
+    assert entry.user_sid is None

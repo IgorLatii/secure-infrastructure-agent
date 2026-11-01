@@ -86,3 +86,18 @@ class ScheduledTask:
 class ScheduledTasks:
     target: str
     tasks: list[ScheduledTask]
+
+
+@dataclass
+class StartupEntry:
+    name: str
+    command: str
+    location: str
+    scope: str
+    user_sid: str | None
+
+
+@dataclass
+class StartupEntries:
+    target: str
+    entries: list[StartupEntry]

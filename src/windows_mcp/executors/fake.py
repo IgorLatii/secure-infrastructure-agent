@@ -14,6 +14,8 @@ from ..models import (
     ScheduledTask,
     ScheduledTasks,
     ScheduledTaskAction,
+    StartupEntry,
+    StartupEntries,
 )
 
 
@@ -149,6 +151,31 @@ class FakeWindowsExecutor(WindowsExecutor):
                                 arguments="--background",
                             )
                         ],
+                    )
+                ],
+            )
+
+        if operation is WindowsOperation.STARTUP_ENTRIES:
+            if parameters is None:
+                raise ValueError(
+                    "STARTUP_ENTRIES requires parameters"
+                )
+
+            return StartupEntries(
+                target=target,
+                entries=[
+                    StartupEntry(
+                        name="UpdateHelper",
+                        command=(
+                            r"C:\Program Files\Example\update-helper.exe "
+                            r"--background"
+                        ),
+                        location=(
+                            r"HKLM\Software\Microsoft\Windows"
+                            r"\CurrentVersion\Run"
+                        ),
+                        scope="Machine",
+                        user_sid=None,
                     )
                 ],
             )

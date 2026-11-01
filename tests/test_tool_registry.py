@@ -49,7 +49,7 @@ async def test_registry_exposes_provider_neutral_tool_definitions():
 
         definitions = registry.get_tool_definitions()
 
-    assert len(definitions) == 5
+    assert len(definitions) == 6
 
     events_tool = next(
         definition
@@ -166,3 +166,24 @@ async def test_registry_exposes_provider_neutral_tool_definitions():
     assert tasks_properties["max_tasks"]["minimum"] == 1
     assert tasks_properties["max_tasks"]["maximum"] == 100
     assert tasks_properties["max_tasks"]["default"] == 50
+
+    startup_tool = next(
+        definition
+        for definition in definitions
+        if definition.name == "get_startup_entries"
+    )
+
+    startup_schema = startup_tool.input_schema
+
+    assert startup_schema["required"] == [
+        "target",
+    ]
+
+    startup_properties = startup_schema["properties"]
+
+    assert startup_properties["target"]["type"] == "string"
+
+    assert startup_properties["max_entries"]["type"] == "integer"
+    assert startup_properties["max_entries"]["minimum"] == 1
+    assert startup_properties["max_entries"]["maximum"] == 100
+    assert startup_properties["max_entries"]["default"] == 50

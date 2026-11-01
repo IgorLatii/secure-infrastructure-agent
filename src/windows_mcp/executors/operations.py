@@ -13,3 +13,4 @@ class WindowsOperation(str, Enum):
     SERVICE_STATUS = "service_status"
     WINDOWS_EVENTS = "windows_events"
     SCHEDULED_TASKS = "scheduled_tasks"
+    STARTUP_ENTRIES = "startup_entries"

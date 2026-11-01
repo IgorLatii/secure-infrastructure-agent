@@ -8,6 +8,8 @@ from .tools.processes import register_process_tools
 from .tools.services import register_service_tools
 from .tools.events import register_event_tools
 from .tools.tasks import register_task_tools
+from .tools.startup import register_startup_tools
+
 
 def create_server(
     executor: WindowsExecutor | None = None,
@@ -48,6 +50,11 @@ def create_server(
     )
 
     register_task_tools(
+        mcp=mcp,
+        diagnostics=diagnostics,
+    )
+
+    register_startup_tools(
         mcp=mcp,
         diagnostics=diagnostics,
     )

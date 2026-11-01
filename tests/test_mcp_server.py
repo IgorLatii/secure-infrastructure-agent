@@ -193,3 +193,39 @@ async def test_mcp_calls_scheduled_tasks_tool():
             == r"C:\Program Files\Example\update-helper.exe"
     )
     assert action["arguments"] == "--background"
+
+@pytest.mark.anyio
+async def test_mcp_calls_startup_entries_tool():
+    server = create_server()
+
+    async with Client(server) as client:
+        result = await client.call_tool(
+            "get_startup_entries",
+            {
+                "target": "LAB-PC",
+                "max_entries": 20,
+            },
+        )
+
+    assert result.is_error is False
+
+    startup_entries = result.structured_content
+
+    assert startup_entries is not None
+    assert startup_entries["target"] == "LAB-PC"
+
+    assert len(startup_entries["entries"]) == 1
+
+    entry = startup_entries["entries"][0]
+
+    assert entry["name"] == "UpdateHelper"
+    assert (
+        entry["command"]
+        == r"C:\Program Files\Example\update-helper.exe --background"
+    )
+    assert (
+        entry["location"]
+        == r"HKLM\Software\Microsoft\Windows\CurrentVersion\Run"
+    )
+    assert entry["scope"] == "Machine"
+    assert entry["user_sid"] is None

@@ -6,6 +6,7 @@ from ..models import (
     SystemHealth,
     TopProcesses,
     WindowsEvents,
+    StartupEntries
 )
 
 
@@ -80,5 +81,18 @@ class DiagnosticService:
             parameters={
                 "task_name": task_name,
                 "max_tasks": max_tasks,
+            },
+        )
+
+    def get_startup_entries(
+            self,
+            target: str,
+            max_entries: int = 50,
+    ) -> StartupEntries:
+        return self.executor.execute(
+            target=target,
+            operation=WindowsOperation.STARTUP_ENTRIES,
+            parameters={
+                "max_entries": max_entries,
             },
         )
