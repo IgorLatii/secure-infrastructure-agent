@@ -49,7 +49,24 @@ async def test_registry_exposes_provider_neutral_tool_definitions():
 
         definitions = registry.get_tool_definitions()
 
-    assert len(definitions) == 6
+    assert len(definitions) == 7
+
+    network_tool = next(
+        tool
+        for tool in definitions
+        if tool.name == "get_network_connections"
+    )
+
+    schema = network_tool.input_schema
+
+    assert schema["required"] == ["target"]
+
+    assert schema["properties"]["target"]["type"] == "string"
+
+    assert schema["properties"]["max_connections"]["type"] == "integer"
+    assert schema["properties"]["max_connections"]["minimum"] == 1
+    assert schema["properties"]["max_connections"]["maximum"] == 100
+    assert schema["properties"]["max_connections"]["default"] == 50
 
     events_tool = next(
         definition

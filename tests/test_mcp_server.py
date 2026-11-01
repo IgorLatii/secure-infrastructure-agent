@@ -229,3 +229,34 @@ async def test_mcp_calls_startup_entries_tool():
     )
     assert entry["scope"] == "Machine"
     assert entry["user_sid"] is None
+
+@pytest.mark.anyio
+async def test_mcp_calls_network_connections_tool():
+
+    server = create_server()
+
+    async with Client(server) as client:
+        result = await client.call_tool(
+            "get_network_connections",
+            {
+                "target": "LAB-PC",
+                "max_connections": 20,
+            },
+        )
+
+    assert result.is_error is False
+
+    network_connections = result.structured_content
+    assert network_connections is not None
+    assert network_connections["target"] == "LAB-PC"
+    assert len(network_connections["connections"]) == 1
+
+    connection = network_connections["connections"][0]
+
+    assert connection["local_address"] == "192.0.2.10"
+    assert connection["local_port"] == 51422
+    assert connection["remote_address"] == "203.0.113.50"
+    assert connection["remote_port"] == 443
+    assert connection["state"] == "Established"
+    assert connection["pid"] == 4820
+    assert connection["process_name"] == "update-helper.exe"

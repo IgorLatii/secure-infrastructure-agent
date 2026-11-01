@@ -10,6 +10,7 @@ from src.windows_mcp.models import (
     WindowsEvents,
     ScheduledTasks,
     StartupEntries,
+    NetworkConnections,
 )
 
 class FakeWindowsTransport(WindowsTransport):
@@ -219,6 +220,53 @@ class StartupEntriesTransport(WindowsTransport):
             ]
         }
         """
+
+class NetworkConnectionsTransport(WindowsTransport):
+    def run_powershell(
+        self,
+        target: str,
+        script: str,
+    ) -> str:
+        return """
+        {
+            "connections": [
+                {
+                    "local_address": "192.0.2.10",
+                    "local_port": 51422,
+                    "remote_address": "203.0.113.50",
+                    "remote_port": 443,
+                    "state": "Established",
+                    "pid": 4820,
+                    "process_name": "update-helper.exe"
+                }
+            ]
+        }
+        """
+
+def test_network_connections_are_parsed_into_structured_evidence():
+    executor = WinRMExecutor(NetworkConnectionsTransport())
+
+    result = executor.execute(
+        target="LAB-PC",
+        operation=WindowsOperation.NETWORK_CONNECTIONS,
+        parameters={
+            "max_connections": 20,
+        },
+    )
+
+    assert isinstance(result, NetworkConnections)
+    assert result.target == "LAB-PC"
+    assert len(result.connections) == 1
+
+    connection = result.connections[0]
+
+    assert connection.local_address == "192.0.2.10"
+    assert connection.local_port == 51422
+    assert connection.remote_address == "203.0.113.50"
+    assert connection.remote_port == 443
+    assert connection.state == "Established"
+    assert connection.pid == 4820
+    assert connection.process_name == "update-helper.exe"
 
 def test_startup_entries_are_parsed_into_structured_evidence():
     executor = WinRMExecutor(StartupEntriesTransport())
@@ -539,5 +587,30 @@ def test_startup_entries_rejects_invalid_max_entries_types(
             operation=WindowsOperation.STARTUP_ENTRIES,
             parameters={
                 "max_entries": invalid_max_entries,
+            },
+        )
+
+@pytest.mark.parametrize(
+    "invalid_max_connections",
+    [
+        True,
+        False,
+        0,
+        101,
+        1.5,
+        "50",
+    ],
+)
+def test_network_connections_rejects_invalid_max_connections(
+        invalid_max_connections,
+):
+    executor = WinRMExecutor(FakeWindowsTransport())
+
+    with pytest.raises(ValueError):
+        executor.execute(
+            target="LAB-PC",
+            operation=WindowsOperation.NETWORK_CONNECTIONS,
+            parameters={
+                "max_connections": invalid_max_connections,
             },
         )

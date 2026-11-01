@@ -8,6 +8,7 @@ from src.windows_mcp.models import (
     TopProcesses,
     WindowsEvents,
     StartupEntries,
+    NetworkConnections,
 )
 from src.windows_mcp.services.diagnostics import DiagnosticService
 
@@ -147,3 +148,25 @@ def test_get_startup_entries_returns_structured_entries():
     )
     assert entry.scope == "Machine"
     assert entry.user_sid is None
+
+def test_get_network_connections_returns_structured_connections():
+    service = DiagnosticService(FakeWindowsExecutor())
+
+    result = service.get_network_connections(
+        target="LAB-PC",
+        max_connections=20,
+    )
+
+    assert isinstance(result, NetworkConnections)
+    assert result.target == "LAB-PC"
+    assert len(result.connections) == 1
+
+    connection = result.connections[0]
+
+    assert connection.local_address == "192.0.2.10"
+    assert connection.local_port == 51422
+    assert connection.remote_address == "203.0.113.50"
+    assert connection.remote_port == 443
+    assert connection.state == "Established"
+    assert connection.pid == 4820
+    assert connection.process_name == "update-helper.exe"

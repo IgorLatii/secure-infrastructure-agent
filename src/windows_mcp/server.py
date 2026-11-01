@@ -9,6 +9,7 @@ from .tools.services import register_service_tools
 from .tools.events import register_event_tools
 from .tools.tasks import register_task_tools
 from .tools.startup import register_startup_tools
+from .tools.network import register_network_tools
 
 
 def create_server(
@@ -55,6 +56,11 @@ def create_server(
     )
 
     register_startup_tools(
+        mcp=mcp,
+        diagnostics=diagnostics,
+    )
+
+    register_network_tools(
         mcp=mcp,
         diagnostics=diagnostics,
     )

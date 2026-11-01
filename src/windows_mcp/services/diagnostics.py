@@ -6,7 +6,8 @@ from ..models import (
     SystemHealth,
     TopProcesses,
     WindowsEvents,
-    StartupEntries
+    StartupEntries,
+    NetworkConnections,
 )
 
 
@@ -94,5 +95,18 @@ class DiagnosticService:
             operation=WindowsOperation.STARTUP_ENTRIES,
             parameters={
                 "max_entries": max_entries,
+            },
+        )
+
+    def get_network_connections(
+            self,
+            target: str,
+            max_connections: int = 50,
+    ) -> NetworkConnections:
+        return self.executor.execute(
+            target=target,
+            operation=WindowsOperation.NETWORK_CONNECTIONS,
+            parameters={
+                "max_connections": max_connections,
             },
         )

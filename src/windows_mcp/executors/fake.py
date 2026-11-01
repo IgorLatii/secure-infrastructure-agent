@@ -16,6 +16,8 @@ from ..models import (
     ScheduledTaskAction,
     StartupEntry,
     StartupEntries,
+    NetworkConnection,
+    NetworkConnections,
 )
 
 
@@ -176,6 +178,27 @@ class FakeWindowsExecutor(WindowsExecutor):
                         ),
                         scope="Machine",
                         user_sid=None,
+                    )
+                ],
+            )
+
+        if operation is WindowsOperation.NETWORK_CONNECTIONS:
+            if parameters is None:
+                raise ValueError(
+                    "NETWORK_CONNECTIONS requires parameters"
+                )
+
+            return NetworkConnections(
+                target=target,
+                connections=[
+                    NetworkConnection(
+                        local_address="192.0.2.10",
+                        local_port=51422,
+                        remote_address="203.0.113.50",
+                        remote_port=443,
+                        state="Established",
+                        pid=4820,
+                        process_name="update-helper.exe",
                     )
                 ],
             )

@@ -101,3 +101,20 @@ class StartupEntry:
 class StartupEntries:
     target: str
     entries: list[StartupEntry]
+
+
+@dataclass
+class NetworkConnection:
+    local_address: str
+    local_port: int
+    remote_address: str
+    remote_port: int
+    state: str
+    pid: int
+    process_name: str
+
+
+@dataclass
+class NetworkConnections:
+    target: str
+    connections: list[NetworkConnection]
