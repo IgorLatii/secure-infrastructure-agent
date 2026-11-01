@@ -20,6 +20,8 @@ async def test_mcp_exposes_diagnostic_tools():
     assert "get_top_processes" in tool_names
     assert "get_service_status" in tool_names
     assert "get_windows_events" in tool_names
+    assert "get_process_details" in tool_names
+
 
 @pytest.mark.anyio
 async def test_mcp_calls_system_health_tool():
@@ -260,3 +262,36 @@ async def test_mcp_calls_network_connections_tool():
     assert connection["state"] == "Established"
     assert connection["pid"] == 4820
     assert connection["process_name"] == "update-helper.exe"
+
+    @pytest.mark.anyio
+    async def test_mcp_calls_process_details_tool():
+        server = create_server()
+
+        async with Client(server) as client:
+            result = await client.call_tool(
+                "get_process_details",
+                {
+                    "target": "LAB-PC",
+                    "pid": 4820,
+                },
+            )
+
+        assert result.is_error is False
+
+        process_details = result.structured_content
+
+        assert process_details is not None
+        assert process_details["target"] == "LAB-PC"
+        assert process_details["pid"] == 4820
+        assert process_details["name"] == "update-helper.exe"
+        assert (
+                process_details["executable_path"]
+                == r"C:\Program Files\Example\update-helper.exe"
+        )
+        assert (
+                process_details["command_line"]
+                == r'"C:\Program Files\Example\update-helper.exe" --background'
+        )
+        assert process_details["parent_pid"] == 1200
+        assert process_details["user"] == r"LAB\analyst"
+        assert process_details["start_time"] == "2026-11-01T08:30:00Z"

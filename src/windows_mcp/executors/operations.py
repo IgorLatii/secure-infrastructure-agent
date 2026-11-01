@@ -15,3 +15,4 @@ class WindowsOperation(str, Enum):
     SCHEDULED_TASKS = "scheduled_tasks"
     STARTUP_ENTRIES = "startup_entries"
     NETWORK_CONNECTIONS = "network_connections"
+    PROCESS_DETAILS = "process_details"

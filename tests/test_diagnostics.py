@@ -9,6 +9,7 @@ from src.windows_mcp.models import (
     WindowsEvents,
     StartupEntries,
     NetworkConnections,
+    ProcessDetails,
 )
 from src.windows_mcp.services.diagnostics import DiagnosticService
 
@@ -170,3 +171,22 @@ def test_get_network_connections_returns_structured_connections():
     assert connection.state == "Established"
     assert connection.pid == 4820
     assert connection.process_name == "update-helper.exe"
+
+
+def test_get_process_details_returns_structured_process_evidence():
+    service = DiagnosticService(FakeWindowsExecutor())
+
+    result = service.get_process_details(
+        target="LAB-PC",
+        pid=4820,
+    )
+
+    assert isinstance(result, ProcessDetails)
+    assert result.target == "LAB-PC"
+    assert result.pid == 4820
+    assert result.name == "update-helper.exe"
+    assert (
+        result.executable_path
+        == r"C:\Program Files\Example\update-helper.exe"
+    )
+    assert result.parent_pid == 1200

@@ -11,6 +11,7 @@ from src.windows_mcp.models import (
     ScheduledTasks,
     StartupEntries,
     NetworkConnections,
+    ProcessDetails,
 )
 
 class FakeWindowsTransport(WindowsTransport):
@@ -240,6 +241,24 @@ class NetworkConnectionsTransport(WindowsTransport):
                     "process_name": "update-helper.exe"
                 }
             ]
+        }
+        """
+
+class ProcessDetailsTransport(WindowsTransport):
+    def run_powershell(
+        self,
+        target: str,
+        script: str,
+    ) -> str:
+        return """
+        {
+            "pid": 4820,
+            "name": "update-helper.exe",
+            "executable_path": "C:\\\\Program Files\\\\Example\\\\update-helper.exe",
+            "command_line": "\\"C:\\\\Program Files\\\\Example\\\\update-helper.exe\\" --background",
+            "parent_pid": 1200,
+            "user": "LAB\\\\analyst",
+            "start_time": "2026-11-01T08:30:00Z"
         }
         """
 
@@ -614,3 +633,105 @@ def test_network_connections_rejects_invalid_max_connections(
                 "max_connections": invalid_max_connections,
             },
         )
+
+@pytest.mark.parametrize(
+    "invalid_pid",
+    [
+        True,
+        False,
+        0,
+        -1,
+        1.5,
+        "4820",
+    ],
+)
+def test_process_details_rejects_invalid_pid(
+        invalid_pid,
+):
+    executor = WinRMExecutor(FakeWindowsTransport())
+
+    with pytest.raises(ValueError):
+        executor.execute(
+            target="LAB-PC",
+            operation=WindowsOperation.PROCESS_DETAILS,
+            parameters={
+                "pid": invalid_pid,
+            },
+        )
+
+def test_process_details_requires_pid():
+    executor = WinRMExecutor(FakeWindowsTransport())
+
+    with pytest.raises(
+        ValueError,
+        match="PROCESS_DETAILS requires parameter: pid",
+    ):
+        executor.execute(
+            target="LAB-PC",
+            operation=WindowsOperation.PROCESS_DETAILS,
+            parameters={},
+        )
+
+def test_process_details_are_parsed_into_structured_evidence():
+    executor = WinRMExecutor(ProcessDetailsTransport())
+
+    result = executor.execute(
+        target="LAB-PC",
+        operation=WindowsOperation.PROCESS_DETAILS,
+        parameters={
+            "pid": 4820,
+        },
+    )
+
+    assert isinstance(result, ProcessDetails)
+    assert result.target == "LAB-PC"
+    assert result.pid == 4820
+    assert result.name == "update-helper.exe"
+    assert (
+        result.executable_path
+        == r"C:\Program Files\Example\update-helper.exe"
+    )
+    assert (
+        result.command_line
+        == r'"C:\Program Files\Example\update-helper.exe" --background'
+    )
+    assert result.parent_pid == 1200
+    assert result.user == r"LAB\analyst"
+    assert result.start_time == "2026-11-01T08:30:00Z"
+
+class ProcessDetailsLimitedTransport(WindowsTransport):
+    def run_powershell(
+        self,
+        target: str,
+        script: str,
+    ) -> str:
+        return """
+        {
+            "pid": 4,
+            "name": "System",
+            "executable_path": null,
+            "command_line": null,
+            "parent_pid": 0,
+            "user": null,
+            "start_time": null
+        }
+        """
+
+def test_process_details_preserve_unavailable_fields_as_none():
+    executor = WinRMExecutor(ProcessDetailsLimitedTransport())
+
+    result = executor.execute(
+        target="LAB-PC",
+        operation=WindowsOperation.PROCESS_DETAILS,
+        parameters={
+            "pid": 4,
+        },
+    )
+
+    assert result.pid == 4
+    assert result.name == "System"
+    assert result.executable_path is None
+    assert result.command_line is None
+    assert result.parent_pid == 0
+    assert result.user is None
+    assert result.start_time is None

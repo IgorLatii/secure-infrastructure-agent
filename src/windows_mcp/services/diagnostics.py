@@ -8,6 +8,7 @@ from ..models import (
     WindowsEvents,
     StartupEntries,
     NetworkConnections,
+    ProcessDetails,
 )
 
 
@@ -108,5 +109,18 @@ class DiagnosticService:
             operation=WindowsOperation.NETWORK_CONNECTIONS,
             parameters={
                 "max_connections": max_connections,
+            },
+        )
+
+    def get_process_details(
+            self,
+            target: str,
+            pid: int,
+    ) -> ProcessDetails:
+        return self.executor.execute(
+            target=target,
+            operation=WindowsOperation.PROCESS_DETAILS,
+            parameters={
+                "pid": pid,
             },
         )

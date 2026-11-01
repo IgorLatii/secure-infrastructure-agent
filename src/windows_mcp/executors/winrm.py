@@ -20,6 +20,7 @@ from ..models import (
     StartupEntries,
     NetworkConnection,
     NetworkConnections,
+    ProcessDetails,
 )
 from ..transports.base import WindowsTransport
 
@@ -50,6 +51,7 @@ class WinRMExecutor(WindowsExecutor):
             WindowsOperation.SCHEDULED_TASKS: self._get_scheduled_tasks,
             WindowsOperation.STARTUP_ENTRIES: self._get_startup_entries,
             WindowsOperation.NETWORK_CONNECTIONS: self._get_network_connections,
+            WindowsOperation.PROCESS_DETAILS: self._get_process_details,
         }
 
         try:
@@ -820,4 +822,85 @@ class WinRMExecutor(WindowsExecutor):
         return NetworkConnections(
             target=target,
             connections=connections,
+        )
+
+    def _get_process_details(
+            self,
+            target: str,
+            parameters: dict[str, object] | None,
+    ) -> ProcessDetails:
+        if parameters is None or "pid" not in parameters:
+            raise ValueError(
+                "PROCESS_DETAILS requires parameter: pid"
+            )
+
+        pid = parameters["pid"]
+
+        if isinstance(pid, bool) or not isinstance(pid, int):
+            raise ValueError(
+                "pid must be an integer"
+            )
+
+        if pid < 1:
+            raise ValueError(
+                "pid must be greater than 0"
+            )
+
+        script = f"""
+        $process = Get-CimInstance Win32_Process `
+            -Filter "ProcessId = {pid}" `
+            -ErrorAction SilentlyContinue
+
+        if ($null -eq $process) {{
+            throw "Process not found"
+        }}
+
+        $runtimeProcess = Get-Process `
+            -Id {pid} `
+            -IncludeUserName `
+            -ErrorAction SilentlyContinue
+
+        $userName = $null
+        $startTime = $null
+
+        if ($null -ne $runtimeProcess) {{
+            $userName = [string]$runtimeProcess.UserName
+
+            try {{
+                $startTime = $runtimeProcess.StartTime.ToUniversalTime().ToString('o')
+            }}
+            catch {{
+                $startTime = $null
+            }}
+        }}
+
+        $result = @{{
+            pid = [int]$process.ProcessId
+            name = [string]$process.Name
+            executable_path = $process.ExecutablePath
+            command_line = $process.CommandLine
+            parent_pid = [int]$process.ParentProcessId
+            user = $userName
+            start_time = $startTime
+        }}
+
+        $result | ConvertTo-Json -Compress
+        """
+
+        raw_output = self._transport.run_powershell(
+            target=target,
+            script=script,
+        )
+
+        data = json.loads(raw_output)
+
+        return ProcessDetails(
+            target=target,
+            pid=data["pid"],
+            name=data["name"],
+            executable_path=data["executable_path"],
+            command_line=data["command_line"],
+            parent_pid=data["parent_pid"],
+            user=data["user"],
+            start_time=data["start_time"],
         )

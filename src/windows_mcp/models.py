@@ -118,3 +118,15 @@ class NetworkConnection:
 class NetworkConnections:
     target: str
     connections: list[NetworkConnection]
+
+
+@dataclass
+class ProcessDetails:
+    target: str
+    pid: int
+    name: str
+    executable_path: str | None
+    command_line: str | None
+    parent_pid: int | None
+    user: str | None
+    start_time: str | None

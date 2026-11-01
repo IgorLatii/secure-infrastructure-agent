@@ -18,6 +18,7 @@ from ..models import (
     StartupEntries,
     NetworkConnection,
     NetworkConnections,
+    ProcessDetails,
 )
 
 
@@ -201,6 +202,27 @@ class FakeWindowsExecutor(WindowsExecutor):
                         process_name="update-helper.exe",
                     )
                 ],
+            )
+
+        if operation is WindowsOperation.PROCESS_DETAILS:
+            if parameters is None or "pid" not in parameters:
+                raise ValueError(
+                    "PROCESS_DETAILS requires parameter: pid"
+                )
+
+            pid = parameters["pid"]
+
+            return ProcessDetails(
+                target=target,
+                pid=pid,
+                name="update-helper.exe",
+                executable_path=r"C:\Program Files\Example\update-helper.exe",
+                command_line=(
+                    r'"C:\Program Files\Example\update-helper.exe" --background'
+                ),
+                parent_pid=1200,
+                user=r"LAB\analyst",
+                start_time="2026-11-01T08:30:00Z",
             )
 
         raise ValueError(f"Unsupported operation: {operation}")
